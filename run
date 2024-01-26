@@ -5,8 +5,10 @@ set -e
 cd "$(dirname "$0")"
 
 GIT_BRANCH=$(git branch 2>/dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/')
-IMAGE_NAME="base-workspace-${GIT_BRANCH}"
-CONTAINER_NAME="base-workspace-${GIT_BRANCH}"
+GIT_COMMIT=$(git rev-parse --short HEAD)$([ -z "$(git status --porcelain)" ] && echo -n "" || echo -n " with uncommitted changes")
+
+IMAGE_NAME="acal-workspace-${GIT_BRANCH}"
+CONTAINER_NAME="acal-workspace-${GIT_BRANCH}"
 USERNAME="$(id -un)"
 
 VOLUME_PROJECTS_DIR="${PWD}/projects/"
@@ -16,11 +18,11 @@ VOLUME_VSCODESERVER_DIR="${PWD}/temp/.vscode-server/"
 usage_message() {
     cat <<EOF
 
-    This script will help you manage the Docker Base Workspace.
+    This script will help you manage the Docker Workspace for ACAL Curriculum (version ${GIT_COMMIT}).
     You can execute this script with the following options.
 
     start     : build and enter the workspace
-    stop      : stop and exit the workspace
+    stop      : terminate the workspace
     prune     : remove the docker image
     rebuild   : remove and build a new image to apply new changes
 
