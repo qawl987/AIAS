@@ -6,11 +6,21 @@ ARG USERNAME="user"
 ARG TZ="Asia/Taipei"
 
 ENV INSTALLATION_TOOLS apt-utils \
+    sudo \
     curl \
+    wget \
     software-properties-common
 
 ENV DEVELOPMENT_PACKAGES python3.8 \
-    python3-pip
+    python3-pip \
+    build-essential \
+    valgrind \
+    make \
+    gdb \
+    verilator \
+    qemu-system-riscv32 \
+    openjdk-8-jdk \
+    sbt
 
 ENV TOOL_PACKAGES bash \
     dos2unix \
@@ -19,8 +29,7 @@ ENV TOOL_PACKAGES bash \
     nano \
     tree \
     vim \
-    sudo \
-    wget
+    nano
 
 ENV USER ${USERNAME}
 ENV TERM xterm-256color
@@ -31,10 +40,45 @@ RUN apt-get -qq update && \
     apt-get -qq install ${INSTALLATION_TOOLS} && \
     # prerequisite - git
     add-apt-repository ppa:git-core/ppa && \
+    # prerequisite - sbt
+    echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | tee /etc/apt/sources.list.d/sbt.list && \
+    echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | tee /etc/apt/sources.list.d/sbt_old.list && \
+    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | apt-key add 2> /dev/null && \
     # start install
     apt-get -qq update && \
     apt-get -qq upgrade && \
     apt-get -qq install ${DEVELOPMENT_PACKAGES} ${TOOL_PACKAGES}
+
+# set env var JAVA_HOME
+ENV JAVA_HOME "/usr/lib/jvm/java-8-openjdk-*"
+
+# install sifive elf2hex (Verilog/Chisel friendly hex file generator)
+ARG SIFIVE_ELF2HEX_URL=https://github.com/sifive/elf2hex/releases/download/v1.0.1/elf2hex-1.0.1.tar.gz
+ENV RISCV "/opt/riscv"
+RUN mkdir -p ${RISCV} && cd ${RISCV} && \
+    wget -q ${SIFIVE_ELF2HEX_URL} && \
+    tar -xvzpf elf2hex-1.0.1.tar.gz >> /dev/null && \
+    cd elf2hex-1.0.1 && \
+    ./configure --target=riscv64-unknown-elf && \
+    make && \
+    make install && \
+    cd .. && rm -rf elf2hex-1.0.1.tar.gz elf2hex-1.0.1
+
+# install RISC-V GNU Toolchain (x86_64 or Arm64 according to TARGETARCH)
+# TODO: the pre-built executables should be moved to a new file server
+# ARG RISCV_GNU_TOOLCHAIN_URL_X86_64="https://playlab.computing.ncku.edu.tw/downloads/riscv-gnu-toolchain/riscv64-elf-Linux-x86_64-65056bd.tar.gz"
+# ARG RISCV_GNU_TOOLCHAIN_URL_ARM64="https://playlab.computing.ncku.edu.tw/downloads/riscv-gnu-toolchain/riscv64-elf-Linux-aarch64-65056bd.tar.gz"
+# ARG TARGETARCH
+# RUN cd ${RISCV} && \
+#     mkdir "riscv-gnu-toolchain" && \
+#     if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
+#     wget -q ${RISCV_GNU_TOOLCHAIN_URL_ARM64} -O "riscv-gnu-toolchain.tar.gz"; \
+#     else \
+#     wget -q ${RISCV_GNU_TOOLCHAIN_URL_X86_64} -O "riscv-gnu-toolchain.tar.gz"; \
+#     fi && \
+#     tar zxvf "riscv-gnu-toolchain.tar.gz" -C "riscv-gnu-toolchain" --strip-components 1 >> /dev/null && \
+#     rm -rf "riscv-gnu-toolchain.tar.gz"
+# ENV PATH=${PATH}:${RISCV}/riscv-gnu-toolchain/bin"
 
 # install python libraries
 COPY ./config/requirements.txt /tmp/requirements.txt
