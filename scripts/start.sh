@@ -25,5 +25,6 @@ else
     sudo chown "$(id -u)":"$(id -g)" "/home/$(id -un)/projects" && chmod 755 "/home/$(id -un)/projects"
 fi
 
+
 # keep the container running
 tail -f /dev/null

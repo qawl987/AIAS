@@ -93,12 +93,32 @@ RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
     echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
 ENV PATH /opt/conda/bin:$PATH
 
-
 # install python libraries
+SHELL ["/bin/bash", "--login", "-c"]
 COPY ./config/requirements.txt /tmp/requirements.txt
-RUN pip3 install --upgrade pip && \
-    pip3 install -r /tmp/requirements.txt && \
+RUN conda create -y -q --name python39 python=3.9; \
+    conda init bash;\
+    source activate python39; \
+    pip3 install --upgrade pip && \
+    pip3 install -r /tmp/requirements.txt;\
+    conda deactivate; \
     rm /tmp/requirements.txt
+
+# setup tensorflow virtualenv
+COPY ./config/tensorflow-requirements.txt /tmp/tensorflow-requirements.txt
+RUN conda create -y -q --name tensorflow python=3.9; \
+    conda init bash;\
+    source activate tensorflow; \
+    conda install -q -y ipython; \
+    conda install -q -y jupyter; \
+    pip3 install --upgrade pip && \
+    pip3 install -r /tmp/tensorflow-requirements.txt;\
+    conda install -q -y tensorflow; \
+    conda deactivate; \
+    rm /tmp/tensorflow-requirements.txt
+
+# Add alias for jupyter commands
+RUN echo "alias run-jupyter=\"jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &\" " >> /opt/conda/etc/profile.d/conda.sh
 
 # setup time zone
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
