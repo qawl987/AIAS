@@ -118,7 +118,7 @@ RUN conda create -y -q --name tensorflow python=3.9; \
     rm /tmp/tensorflow-requirements.txt
 
 # Add alias for jupyter commands
-RUN echo "alias run-jupyter=\"jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &\" " >> /opt/conda/etc/profile.d/conda.sh
+RUN echo "alias run-jupyter=\"jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &\" " >> /opt/conda/etc/profile.d/conda.sh
 
 # setup time zone
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
