@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM --platform=linux/amd64 ubuntu:20.04
 
 ARG UID=1000
 ARG GID=1000
@@ -19,6 +19,7 @@ ENV DEVELOPMENT_PACKAGES python3.8 \
     gdb \
     verilator \
     qemu-system-riscv32 \
+    ca-certificates-java \
     openjdk-8-jdk \
     sbt
 
@@ -29,7 +30,7 @@ ENV TOOL_PACKAGES bash \
     nano \
     tree \
     vim \
-    nano
+    emacs 
 
 ENV USER ${USERNAME}
 ENV TERM xterm-256color
@@ -79,6 +80,19 @@ RUN mkdir -p ${RISCV} && cd ${RISCV} && \
 #     tar zxvf "riscv-gnu-toolchain.tar.gz" -C "riscv-gnu-toolchain" --strip-components 1 >> /dev/null && \
 #     rm -rf "riscv-gnu-toolchain.tar.gz"
 # ENV PATH=${PATH}:${RISCV}/riscv-gnu-toolchain/bin"
+
+# install conda
+ARG TARGETARCH
+RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
+     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
+     else \
+     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
+     fi 
+RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh && \
+    echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
+ENV PATH /opt/conda/bin:$PATH
+
 
 # install python libraries
 COPY ./config/requirements.txt /tmp/requirements.txt
