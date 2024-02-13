@@ -157,6 +157,9 @@ RUN mkdir -p /home/${USERNAME}/.ssh && \
     mkdir -p /home/${USERNAME}/projects
 RUN chown -R ${UID}:${GID} /home/${USERNAME}
 
+# TensorBoard setup
+EXPOSE 10000
+
 USER ${USERNAME}
 
 WORKDIR /home/${USERNAME}
