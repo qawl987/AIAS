@@ -66,20 +66,19 @@ RUN mkdir -p ${RISCV} && cd ${RISCV} && \
     cd .. && rm -rf elf2hex-1.0.1.tar.gz elf2hex-1.0.1
 
 # install RISC-V GNU Toolchain (x86_64 or Arm64 according to TARGETARCH)
-# TODO: the pre-built executables should be moved to a new file server
-# ARG RISCV_GNU_TOOLCHAIN_URL_X86_64="https://playlab.computing.ncku.edu.tw/downloads/riscv-gnu-toolchain/riscv64-elf-Linux-x86_64-65056bd.tar.gz"
-# ARG RISCV_GNU_TOOLCHAIN_URL_ARM64="https://playlab.computing.ncku.edu.tw/downloads/riscv-gnu-toolchain/riscv64-elf-Linux-aarch64-65056bd.tar.gz"
-# ARG TARGETARCH
-# RUN cd ${RISCV} && \
-#     mkdir "riscv-gnu-toolchain" && \
-#     if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
-#     wget -q ${RISCV_GNU_TOOLCHAIN_URL_ARM64} -O "riscv-gnu-toolchain.tar.gz"; \
-#     else \
-#     wget -q ${RISCV_GNU_TOOLCHAIN_URL_X86_64} -O "riscv-gnu-toolchain.tar.gz"; \
-#     fi && \
-#     tar zxvf "riscv-gnu-toolchain.tar.gz" -C "riscv-gnu-toolchain" --strip-components 1 >> /dev/null && \
-#     rm -rf "riscv-gnu-toolchain.tar.gz"
-# ENV PATH=${PATH}:${RISCV}/riscv-gnu-toolchain/bin"
+ARG RISCV_GNU_TOOLCHAIN_URL_X86_64="https://file.playlab.tw/riscv64-elf-Linux-x86_64-65056bd.tar.gz"
+ARG RISCV_GNU_TOOLCHAIN_URL_ARM64="https://file.playlab.tw/riscv64-elf-Linux-aarch64-65056bd.tar.gz"
+ARG TARGETARCH
+RUN cd ${RISCV} && \
+    mkdir "riscv-gnu-toolchain" && \
+    if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
+    wget -q ${RISCV_GNU_TOOLCHAIN_URL_ARM64} -O "riscv-gnu-toolchain.tar.gz"; \
+    else \
+    wget -q ${RISCV_GNU_TOOLCHAIN_URL_X86_64} -O "riscv-gnu-toolchain.tar.gz"; \
+    fi && \
+    tar zxvf "riscv-gnu-toolchain.tar.gz" -C "riscv-gnu-toolchain" --strip-components 1 >> /dev/null && \
+    rm -rf "riscv-gnu-toolchain.tar.gz"
+ENV PATH=${PATH}:"${RISCV}/riscv-gnu-toolchain/bin"
 
 # install conda
 ARG TARGETARCH
