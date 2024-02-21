@@ -30,9 +30,9 @@ ENV TOOL_PACKAGES bash \
     nano \
     tree \
     vim \
-    emacs 
+    emacs
 
-ENV USER ${USERNAME}
+ENV USER "${USERNAME}"
 ENV TERM xterm-256color
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE DontWarn
 
@@ -86,7 +86,7 @@ RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
      else \
      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
-     fi 
+     fi
 RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
     rm /tmp/miniconda.sh && \
     echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
@@ -133,14 +133,14 @@ RUN sed -i 's/# en_US.UTF-8/en_US.UTF-8/g' /etc/locale.gen && \
 ENV LC_ALL en_US.UTF-8
 
 # add non-root user account
-RUN groupadd -o -g ${GID} ${USERNAME} && \
-    useradd -u ${UID} -m -s /bin/bash -g ${GID} ${USERNAME} && \
-    echo "${USERNAME} ALL = NOPASSWD: ALL" > /etc/sudoers.d/${USERNAME} && \
-    chmod 0440 /etc/sudoers.d/${USERNAME} && \
-    passwd -d ${USERNAME}
+RUN groupadd -o -g ${GID} "${USERNAME}" && \
+    useradd -u ${UID} -m -s /bin/bash -g ${GID} "${USERNAME}" && \
+    echo "${USERNAME} ALL = NOPASSWD: ALL" > /etc/sudoers.d/"${USERNAME}" && \
+    chmod 0440 /etc/sudoers.d/"${USERNAME}" && \
+    passwd -d "${USERNAME}"
 
 # add scripts and setup permissions
-COPY --chown=${UID}:${GID} ./scripts/.bashrc /home/${USERNAME}/.bashrc
+COPY --chown=${UID}:${GID} ./scripts/.bashrc /home/"${USERNAME}"/.bashrc
 COPY --chown=${UID}:${GID} ./scripts/start.sh /docker/start.sh
 COPY --chown=${UID}:${GID} ./scripts/login.sh /docker/login.sh
 COPY --chown=${UID}:${GID} ./scripts/startup.sh /usr/local/bin/startup
@@ -151,16 +151,16 @@ RUN dos2unix -ic "/home/${USERNAME}/.bashrc" | xargs dos2unix && \
     chmod +x "/usr/local/bin/startup"
 
 # user account configuration
-RUN mkdir -p /home/${USERNAME}/.ssh && \
-    mkdir -p /home/${USERNAME}/.vscode-server && \
-    mkdir -p /home/${USERNAME}/projects
-RUN chown -R ${UID}:${GID} /home/${USERNAME}
+RUN mkdir -p /home/"${USERNAME}"/.ssh && \
+    mkdir -p /home/"${USERNAME}"/.vscode-server && \
+    mkdir -p /home/"${USERNAME}"/projects
+RUN chown -R ${UID}:${GID} /home/"${USERNAME}"
 
 # TensorBoard setup
 EXPOSE 10000
 
-USER ${USERNAME}
+USER "${USERNAME}"
 
-WORKDIR /home/${USERNAME}
+WORKDIR /home/"${USERNAME}"
 
 CMD [ "bash", "/docker/start.sh" ]
