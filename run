@@ -30,7 +30,7 @@ EOF
 }
 
 start_environment() {
-    if [[ "$(docker images -q "${IMAGE_NAME}")" == "" ]]; then
+    if ! docker image inspect "${IMAGE_NAME}" >/dev/null; then
         docker build \
             --build-arg UID="$(id -u)" \
             --build-arg GID="$(id -g)" \
