@@ -99,7 +99,7 @@ RUN conda create -y -q --name python39 python=3.9; \
     conda init bash;\
     source activate python39; \
     pip3 install --upgrade pip && \
-    pip3 install -r /tmp/requirements.txt;\
+    pip3 install -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html";\
     conda deactivate; \
     rm /tmp/requirements.txt
 
@@ -111,7 +111,7 @@ RUN conda create -y -q --name tensorflow python=3.9; \
     conda install -q -y ipython; \
     conda install -q -y jupyter; \
     pip3 install --upgrade pip && \
-    pip3 install -r /tmp/tensorflow-requirements.txt;\
+    pip3 install -r /tmp/tensorflow-requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html";\
     conda install -q -y tensorflow; \
     conda deactivate; \
     rm /tmp/tensorflow-requirements.txt
