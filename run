@@ -35,6 +35,7 @@ start_environment() {
             --build-arg UID="$(id -u)" \
             --build-arg GID="$(id -g)" \
             --build-arg USERNAME="${USERNAME}" \
+            --platform=linux/amd64 \
             -t "${IMAGE_NAME}" . ||
             { echo "error due to docker build image" && exit 1; }
     fi
@@ -53,6 +54,7 @@ start_environment() {
             -v "$([[ ${OSTYPE} == "msys" ]] && echo "/${VOLUME_PROJECTS_DIR}" || echo "${VOLUME_PROJECTS_DIR}")":"/home/${USERNAME}/projects/" \
             -v "$([[ ${OSTYPE} == "msys" ]] && echo "/${VOLUME_SSH_DIR}" || echo "${VOLUME_SSH_DIR}")":"/home/${USERNAME}/.ssh/" \
             -v "$([[ ${OSTYPE} == "msys" ]] && echo "/${VOLUME_VSCODESERVER_DIR}" || echo "${VOLUME_VSCODESERVER_DIR}")":"/home/${USERNAME}/.vscode-server/" \
+            --platform=linux/amd64 \
             --hostname "$(echo "${CONTAINER_NAME}" | tr '[:lower:]' '[:upper:]')" \
             --name "${CONTAINER_NAME}" \
             "${IMAGE_NAME}" ||

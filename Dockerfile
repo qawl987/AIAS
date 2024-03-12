@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 ubuntu:20.04
+FROM ubuntu:20.04
 
 ARG UID=1000
 ARG GID=1000
@@ -71,7 +71,7 @@ ARG RISCV_GNU_TOOLCHAIN_URL_ARM64="https://file.playlab.tw/riscv64-elf-Linux-aar
 ARG TARGETARCH
 RUN cd ${RISCV} && \
     mkdir "riscv-gnu-toolchain" && \
-    if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
+    if [ "${TARGETARCH}" = "arm64" ]; then \
     wget -q ${RISCV_GNU_TOOLCHAIN_URL_ARM64} -O "riscv-gnu-toolchain.tar.gz"; \
     else \
     wget -q ${RISCV_GNU_TOOLCHAIN_URL_X86_64} -O "riscv-gnu-toolchain.tar.gz"; \
@@ -82,7 +82,7 @@ ENV PATH=${PATH}:"${RISCV}/riscv-gnu-toolchain/bin"
 
 # install conda
 ARG TARGETARCH
-RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
+RUN if [ "${TARGETARCH}" = "arm64" ]; then \
      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
      else \
      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
