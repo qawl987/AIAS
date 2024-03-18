@@ -1,3 +1,18 @@
+# compile verilator 4.202
+# ref: https://verilator.org/guide/latest/install.html
+FROM ubuntu:22.04 AS verilator_provider
+RUN apt-get -qq update && \
+    apt-get -qq install git make autoconf g++ flex bison python3
+
+WORKDIR /verilator
+RUN git clone -c advice.detachedHead=false --branch "v4.202" --depth 1 "http://git.veripool.org/git/verilator" "verilator"
+
+WORKDIR /verilator/verilator
+RUN unset VERILATOR_ROOT && \
+    autoconf && \
+    ./configure
+RUN make -j $(nproc) --silent
+
 FROM ubuntu:22.04
 
 ARG UID=1000
@@ -18,7 +33,6 @@ ENV DEVELOPMENT_PACKAGES python3 \
     valgrind \
     make \
     gdb \
-    verilator \
     qemu-system-riscv32 \
     ca-certificates-java \
     openjdk-8-jdk \
@@ -85,6 +99,13 @@ ENV PATH=${PATH}:"${RISCV}/riscv-gnu-toolchain/bin"
 COPY ./config/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip && \
     pip3 install -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html"
+
+# install verilator 4.202 for chisel3
+# ref: https://github.com/chipsalliance/chisel3/blob/master/SETUP.md
+COPY --from=verilator_provider "/verilator/verilator" "/tmp/verilator"
+RUN cd /tmp/verilator && \
+    make install && \
+    rm -r /tmp/verilator
 
 # setup time zone
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
