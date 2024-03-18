@@ -13,6 +13,7 @@ ENV INSTALLATION_TOOLS apt-utils \
 
 ENV DEVELOPMENT_PACKAGES python3 \
     python3-pip \
+    python-is-python3 \
     build-essential \
     valgrind \
     make \
@@ -121,6 +122,8 @@ RUN mkdir -p /home/"${USERNAME}"/.ssh && \
     mkdir -p /home/"${USERNAME}"/.vscode-server && \
     mkdir -p /home/"${USERNAME}"/projects
 RUN chown -R ${UID}:${GID} /home/"${USERNAME}"
+
+ENV PATH="${PATH}:/home/${USERNAME}/.local/bin"
 
 # TensorBoard setup
 EXPOSE 10000
