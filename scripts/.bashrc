@@ -123,6 +123,8 @@ if ! shopt -oq posix; then
     fi
 fi
 
+alias run-jupyter="jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &"
+
 clear
 
 bash /docker/login.sh

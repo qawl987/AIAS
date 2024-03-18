@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ARG UID=1000
 ARG GID=1000
@@ -11,7 +11,7 @@ ENV INSTALLATION_TOOLS apt-utils \
     wget \
     software-properties-common
 
-ENV DEVELOPMENT_PACKAGES python3.8 \
+ENV DEVELOPMENT_PACKAGES python3 \
     python3-pip \
     build-essential \
     valgrind \
@@ -80,44 +80,10 @@ RUN cd ${RISCV} && \
     rm -rf "riscv-gnu-toolchain.tar.gz"
 ENV PATH=${PATH}:"${RISCV}/riscv-gnu-toolchain/bin"
 
-# install conda
-ARG TARGETARCH
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
-     else \
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
-     fi
-RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
-    rm /tmp/miniconda.sh && \
-    echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
-ENV PATH /opt/conda/bin:$PATH
-
 # install python libraries
-SHELL ["/bin/bash", "--login", "-c"]
 COPY ./config/requirements.txt /tmp/requirements.txt
-RUN conda create -y -q --name python39 python=3.9; \
-    conda init bash;\
-    source activate python39; \
-    pip3 install --upgrade pip && \
-    pip3 install -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html";\
-    conda deactivate; \
-    rm /tmp/requirements.txt
-
-# setup tensorflow virtualenv
-COPY ./config/tensorflow-requirements.txt /tmp/tensorflow-requirements.txt
-RUN conda create -y -q --name tensorflow python=3.9; \
-    conda init bash;\
-    source activate tensorflow; \
-    conda install -q -y ipython; \
-    conda install -q -y jupyter; \
-    pip3 install --upgrade pip && \
-    pip3 install -r /tmp/tensorflow-requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html";\
-    conda install -q -y tensorflow; \
-    conda deactivate; \
-    rm /tmp/tensorflow-requirements.txt
-
-# Add alias for jupyter commands
-RUN echo "alias run-jupyter=\"jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &\" " >> /opt/conda/etc/profile.d/conda.sh
+RUN pip3 install --upgrade pip && \
+    pip3 install -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html"
 
 # setup time zone
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
