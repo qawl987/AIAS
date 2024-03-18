@@ -1,3 +1,41 @@
+# install python packages
+FROM ubuntu:22.04 AS python_pkg_provider
+RUN apt-get -qq update && \
+    apt-get -qq install python3 python3-pip build-essential
+COPY ./config/requirements.txt /tmp/requirements.txt
+RUN pip3 install --upgrade pip wheel && \
+    pip3 install --user -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html"
+
+# install sifive elf2hex (Verilog/Chisel friendly hex file generator)
+FROM ubuntu:22.04 AS elf2hex_provider
+RUN apt-get -qq update && \
+    apt-get -qq install wget build-essential python3
+
+WORKDIR /elf2hex
+ARG SIFIVE_ELF2HEX_URL="https://github.com/sifive/elf2hex/releases/download/v1.0.1/elf2hex-1.0.1.tar.gz"
+RUN wget -q ${SIFIVE_ELF2HEX_URL} && \
+    tar -xvzpf elf2hex-1.0.1.tar.gz >> /dev/null && \
+    cd elf2hex-1.0.1 && \
+    ./configure --target=riscv64-unknown-elf && \
+    make
+
+# install RISC-V GNU Toolchain (x86_64 or Arm64 according to TARGETARCH)
+FROM ubuntu:22.04 AS riscv_toolchain_provider
+RUN apt-get -qq update && \
+    apt-get -qq install wget
+
+WORKDIR /riscv-gnu
+ARG RISCV_GNU_TOOLCHAIN_URL_X86_64="https://file.playlab.tw/riscv64-elf-Linux-x86_64-65056bd.tar.gz"
+ARG RISCV_GNU_TOOLCHAIN_URL_ARM64="https://file.playlab.tw/riscv64-elf-Linux-aarch64-65056bd.tar.gz"
+ARG TARGETARCH
+RUN mkdir "riscv-gnu-toolchain" && \
+    if [ "${TARGETARCH}" = "arm64" ]; then \
+    wget -q ${RISCV_GNU_TOOLCHAIN_URL_ARM64} -O "riscv-gnu-toolchain.tar.gz"; \
+    else \
+    wget -q ${RISCV_GNU_TOOLCHAIN_URL_X86_64} -O "riscv-gnu-toolchain.tar.gz"; \
+    fi && \
+    tar zxvf "riscv-gnu-toolchain.tar.gz" -C "riscv-gnu-toolchain" --strip-components 1 >> /dev/null
+
 # compile verilator 4.202
 # ref: https://verilator.org/guide/latest/install.html
 FROM ubuntu:22.04 AS verilator_provider
@@ -13,7 +51,8 @@ RUN unset VERILATOR_ROOT && \
     ./configure
 RUN make -j $(nproc) --silent
 
-FROM ubuntu:22.04
+# main stage
+FROM ubuntu:22.04 AS base
 
 ARG UID=1000
 ARG GID=1000
@@ -69,36 +108,14 @@ RUN apt-get -qq update && \
 ENV JAVA_HOME "/usr/lib/jvm/java-8-openjdk-*"
 
 # install sifive elf2hex (Verilog/Chisel friendly hex file generator)
-ARG SIFIVE_ELF2HEX_URL=https://github.com/sifive/elf2hex/releases/download/v1.0.1/elf2hex-1.0.1.tar.gz
-ENV RISCV "/opt/riscv"
-RUN mkdir -p ${RISCV} && cd ${RISCV} && \
-    wget -q ${SIFIVE_ELF2HEX_URL} && \
-    tar -xvzpf elf2hex-1.0.1.tar.gz >> /dev/null && \
-    cd elf2hex-1.0.1 && \
-    ./configure --target=riscv64-unknown-elf && \
-    make && \
+COPY --from=elf2hex_provider /elf2hex/elf2hex-1.0.1 /tmp/elf2hex
+RUN cd /tmp/elf2hex && \
     make install && \
-    cd .. && rm -rf elf2hex-1.0.1.tar.gz elf2hex-1.0.1
+    cd .. && \
+    rm -rf elf2hex-1.0.1
 
 # install RISC-V GNU Toolchain (x86_64 or Arm64 according to TARGETARCH)
-ARG RISCV_GNU_TOOLCHAIN_URL_X86_64="https://file.playlab.tw/riscv64-elf-Linux-x86_64-65056bd.tar.gz"
-ARG RISCV_GNU_TOOLCHAIN_URL_ARM64="https://file.playlab.tw/riscv64-elf-Linux-aarch64-65056bd.tar.gz"
-ARG TARGETARCH
-RUN cd ${RISCV} && \
-    mkdir "riscv-gnu-toolchain" && \
-    if [ "${TARGETARCH}" = "arm64" ]; then \
-    wget -q ${RISCV_GNU_TOOLCHAIN_URL_ARM64} -O "riscv-gnu-toolchain.tar.gz"; \
-    else \
-    wget -q ${RISCV_GNU_TOOLCHAIN_URL_X86_64} -O "riscv-gnu-toolchain.tar.gz"; \
-    fi && \
-    tar zxvf "riscv-gnu-toolchain.tar.gz" -C "riscv-gnu-toolchain" --strip-components 1 >> /dev/null && \
-    rm -rf "riscv-gnu-toolchain.tar.gz"
-ENV PATH=${PATH}:"${RISCV}/riscv-gnu-toolchain/bin"
-
-# install python libraries
-COPY ./config/requirements.txt /tmp/requirements.txt
-RUN pip3 install --upgrade pip && \
-    pip3 install -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html"
+COPY --from=riscv_toolchain_provider /riscv-gnu/riscv-gnu-toolchain/. /usr/
 
 # install verilator 4.202 for chisel3
 # ref: https://github.com/chipsalliance/chisel3/blob/master/SETUP.md
@@ -141,8 +158,13 @@ RUN dos2unix -ic "/home/${USERNAME}/.bashrc" | xargs dos2unix && \
 # user account configuration
 RUN mkdir -p /home/"${USERNAME}"/.ssh && \
     mkdir -p /home/"${USERNAME}"/.vscode-server && \
-    mkdir -p /home/"${USERNAME}"/projects
+    mkdir -p /home/"${USERNAME}"/projects && \
+    mkdir -p /home/"${USERNAME}"/.local
 RUN chown -R ${UID}:${GID} /home/"${USERNAME}"
+
+# install python libraries
+RUN pip3 install --upgrade pip wheel
+COPY --from=python_pkg_provider --chown=${UID}:${GID} /root/.local /home/"${USERNAME}"/.local
 
 ENV PATH="${PATH}:/home/${USERNAME}/.local/bin"
 
