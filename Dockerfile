@@ -1,15 +1,15 @@
 # install python packages
 FROM ubuntu:22.04 AS python_pkg_provider
-RUN apt-get -qq update && \
-    apt-get -qq install python3 python3-pip build-essential
+RUN apt-get -y update && \
+    apt-get -y install python3 python3-pip build-essential
 COPY ./config/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip wheel && \
     pip3 install --user -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html"
 
 # install sifive elf2hex (Verilog/Chisel friendly hex file generator)
 FROM ubuntu:22.04 AS elf2hex_provider
-RUN apt-get -qq update && \
-    apt-get -qq install wget build-essential python3
+RUN apt-get -y update && \
+    apt-get -y install wget build-essential python3
 
 WORKDIR /elf2hex
 ARG SIFIVE_ELF2HEX_URL="https://github.com/sifive/elf2hex/releases/download/v1.0.1/elf2hex-1.0.1.tar.gz"
@@ -21,8 +21,7 @@ RUN wget -q ${SIFIVE_ELF2HEX_URL} && \
 
 # install RISC-V GNU Toolchain (x86_64 or Arm64 according to TARGETARCH)
 FROM ubuntu:22.04 AS riscv_toolchain_provider
-RUN apt-get -qq update && \
-    apt-get -qq install wget
+RUN apt-get -y update && apt-get -y install wget
 
 WORKDIR /riscv-gnu
 ARG RISCV_GNU_TOOLCHAIN_URL_X86_64="https://file.playlab.tw/riscv64-elf-Linux-x86_64-65056bd.tar.gz"
@@ -39,8 +38,8 @@ RUN mkdir "riscv-gnu-toolchain" && \
 # compile verilator 4.202
 # ref: https://verilator.org/guide/latest/install.html
 FROM ubuntu:22.04 AS verilator_provider
-RUN apt-get -qq update && \
-    apt-get -qq install git make autoconf g++ flex bison python3
+RUN apt-get -y update && \
+    apt-get -y install git make autoconf g++ flex bison python3
 
 WORKDIR /verilator
 RUN git clone -c advice.detachedHead=false --branch "v4.202" --depth 1 "http://git.veripool.org/git/verilator" "verilator"
@@ -59,15 +58,21 @@ ARG GID=1000
 ARG USERNAME="user"
 ARG TZ="Asia/Taipei"
 
-ENV INSTALLATION_TOOLS apt-utils \
+ENV INSTALLATION_TOOLS=" \
+    apt-utils \
     sudo \
     curl \
     wget \
-    software-properties-common
+    software-properties-common \
+"
 
-ENV DEVELOPMENT_PACKAGES python3 \
+ENV PYTHON_PACKAGES=" \
+    python3 \
     python3-pip \
     python-is-python3 \
+"
+
+ENV DEVELOPMENT_PACKAGES=" \
     build-essential \
     valgrind \
     make \
@@ -75,37 +80,45 @@ ENV DEVELOPMENT_PACKAGES python3 \
     qemu-system-riscv32 \
     ca-certificates-java \
     openjdk-8-jdk \
-    sbt
+    sbt \
+"
 
-ENV TOOL_PACKAGES bash \
+ENV TOOL_PACKAGES=" \
+    bash \
     dos2unix \
     git \
     locales \
     nano \
     tree \
     vim \
-    emacs
+    emacs \
+    tmux \
+"
 
-ENV USER "${USERNAME}"
-ENV TERM xterm-256color
-ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE DontWarn
+ENV USER="${USERNAME}"
+ENV TERM=xterm-256color
+ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn
 
 # install system packages
-RUN apt-get -qq update && \
-    apt-get -qq install ${INSTALLATION_TOOLS} && \
-    # prerequisite - git
-    add-apt-repository ppa:git-core/ppa && \
-    # prerequisite - sbt
-    echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | tee /etc/apt/sources.list.d/sbt.list && \
+RUN apt-get -y update
+RUN apt-get -y install ${INSTALLATION_TOOLS}
+
+# prerequisite - git
+RUN add-apt-repository ppa:git-core/ppa
+
+# prerequisite - sbt
+RUN echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | tee /etc/apt/sources.list.d/sbt.list && \
     echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | tee /etc/apt/sources.list.d/sbt_old.list && \
-    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | apt-key add 2> /dev/null && \
-    # start install
-    apt-get -qq update && \
-    apt-get -qq upgrade && \
-    apt-get -qq install ${DEVELOPMENT_PACKAGES} ${TOOL_PACKAGES}
+    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | apt-key add 2> /dev/null
+
+# start install
+RUN apt-get -y update && apt-get -y upgrade
+RUN apt-get -y install ${PYTHON_PACKAGES}
+RUN apt-get -y install ${DEVELOPMENT_PACKAGES}
+RUN apt-get -y install ${TOOL_PACKAGES}
 
 # set env var JAVA_HOME
-ENV JAVA_HOME "/usr/lib/jvm/java-8-openjdk-*"
+ENV JAVA_HOME="/usr/lib/jvm/java-8-openjdk-*"
 
 # install sifive elf2hex (Verilog/Chisel friendly hex file generator)
 COPY --from=elf2hex_provider /elf2hex/elf2hex-1.0.1 /tmp/elf2hex
@@ -135,7 +148,7 @@ RUN sed -i 's/# en_US.UTF-8/en_US.UTF-8/g' /etc/locale.gen && \
     dpkg-reconfigure --frontend=noninteractive locales && \
     update-locale LANG=en_US.UTF-8 && \
     update-locale LC_ALL=en_US.UTF-8
-ENV LC_ALL en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # add non-root user account
 RUN groupadd -o -g ${GID} "${USERNAME}" && \
