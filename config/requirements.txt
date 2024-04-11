@@ -20,3 +20,4 @@ tf2onnx==1.16.1
 tensorflow-cpu-aws==2.15.1; platform_system == "Linux" and (platform_machine == "arm64" or platform_machine == "aarch64")
 tensorflow==2.15.1; platform_machine == 'x86_64' or platform_machine == 'amd64'
 torch_tb_profiler==0.4.3
+h5py==3.10.0
