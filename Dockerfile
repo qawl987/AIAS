@@ -81,6 +81,8 @@ ENV DEVELOPMENT_PACKAGES=" \
     ca-certificates-java \
     openjdk-8-jdk \
     sbt \
+    cmake \
+    flatbuffers-compiler \
 "
 
 ENV TOOL_PACKAGES=" \
@@ -136,6 +138,31 @@ COPY --from=verilator_provider "/verilator/verilator" "/tmp/verilator"
 RUN cd /tmp/verilator && \
     make install && \
     rm -r /tmp/verilator
+
+# install conda
+ARG TARGETARCH
+RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
+     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
+     else \
+     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
+     fi
+RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh && \
+    echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
+ENV PATH /opt/conda/bin:$PATH
+
+
+# setup executorch virtualenv
+SHELL ["/bin/bash", "--login", "-c"]
+RUN conda create -yn executorch python=3.10.0 && \
+    conda init bash && \
+    source activate executorch; \
+    pip3 install --upgrade pip; \
+    pip3 install torch executorch; \
+    conda deactivate; 
+
+# Add alias for jupyter commands
+RUN echo "alias run-jupyter=\"jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &\" " >> /opt/conda/etc/profile.d/conda.sh
 
 # setup time zone
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
