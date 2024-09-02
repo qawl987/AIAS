@@ -158,7 +158,7 @@ RUN conda create -yn executorch python=3.10.0 && \
     conda init bash && \
     source activate executorch; \
     pip3 install --upgrade pip; \
-    pip3 install torch executorch; \
+    pip3 install torch==2.2.0+cpu executorch; \
     conda deactivate; 
 
 # Add alias for jupyter commands
