@@ -141,7 +141,7 @@ RUN cd /tmp/verilator && \
 
 # install conda
 ARG TARGETARCH
-RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
+RUN if [ "${TARGETARCH}" = "arm64" ]; then \
      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
      else \
      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
