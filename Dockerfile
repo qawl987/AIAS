@@ -2,7 +2,7 @@
 FROM ubuntu:22.04 AS python_pkg_provider
 RUN apt-get -y update && \
     apt-get -y install python3 python3-pip build-essential
-COPY ./config/requirements.txt /tmp/requirements.txt
+COPY ./dependencies/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip wheel && \
     pip3 install --user -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html"
 
@@ -142,24 +142,14 @@ RUN cd /tmp/verilator && \
 # install conda
 ARG TARGETARCH
 RUN if [ "${TARGETARCH}" = "arm64" ]; then \
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
+     wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
      else \
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
+     wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
      fi
 RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
     rm /tmp/miniconda.sh && \
-    echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
-ENV PATH /opt/conda/bin:$PATH
-
-
-# setup executorch virtualenv
-SHELL ["/bin/bash", "--login", "-c"]
-RUN conda create -yn executorch python=3.10.0 && \
-    conda init bash && \
-    source activate executorch; \
-    pip3 install --upgrade pip; \
-    pip3 install torch==2.2.0+cpu executorch; \
-    conda deactivate; 
+    /opt/conda/bin/conda init bash
+ENV PATH=/opt/conda/condabin:${PATH}
 
 # Add alias for jupyter commands
 RUN echo "alias run-jupyter=\"jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &\" " >> /opt/conda/etc/profile.d/conda.sh
@@ -185,7 +175,7 @@ RUN groupadd -o -g ${GID} "${USERNAME}" && \
     passwd -d "${USERNAME}"
 
 # add scripts and setup permissions
-COPY --chown=${UID}:${GID} ./scripts/.bashrc /home/"${USERNAME}"/.bashrc
+COPY --chown=${UID}:${GID} ./scripts/bashrc /home/"${USERNAME}"/.bashrc
 COPY --chown=${UID}:${GID} ./scripts/start.sh /docker/start.sh
 COPY --chown=${UID}:${GID} ./scripts/login.sh /docker/login.sh
 COPY --chown=${UID}:${GID} ./scripts/startup.sh /usr/local/bin/startup

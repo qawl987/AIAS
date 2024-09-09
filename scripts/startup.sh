@@ -8,3 +8,4 @@ cat <<EOF
     All permanent projects are in the ~/projects directory.
 
 EOF
+
