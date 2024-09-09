@@ -1,6 +1,6 @@
 ipython
 jupyter
-onnxruntime
+onnxruntime==1.19.0
 requests>=2.31
 typing-extensions>=4.8.0
 ipykernel==6.29.0
@@ -20,3 +20,12 @@ tensorflow-cpu-aws==2.15.1; platform_system == "Linux" and (platform_machine == 
 tensorflow==2.15.1; platform_machine == 'x86_64' or platform_machine == 'amd64'
 torch_tb_profiler==0.4.3
 h5py==3.10.0
+numpy==1.26.4
+Pillow==10.4.0
+packaging==24.1
+yapf==0.40.2
+toml==0.10.2
+onnxoptimizer==0.3.13
+onnxsim==0.4.36
+protobuf==3.20.3
+

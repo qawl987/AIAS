@@ -3,7 +3,7 @@ FROM ubuntu:22.04 AS python_pkg_provider
 RUN apt-get -y update && \
     apt-get -y install python3 python3-pip build-essential
 COPY ./dependencies/requirements.txt /tmp/requirements.txt
-RUN pip3 install --upgrade pip wheel && \
+RUN pip3 install --upgrade pip wheel cmake && \
     pip3 install --user -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html"
 
 # install sifive elf2hex (Verilog/Chisel friendly hex file generator)
