@@ -28,4 +28,5 @@ toml==0.10.2
 onnxoptimizer==0.3.13
 onnxsim==0.4.36
 protobuf==3.20.3
-
+flask
+flask_cors
