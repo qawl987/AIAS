@@ -124,13 +124,13 @@ void getAttrParam(torch::jit::Node *node, const torch::jit::named_attribute_list
     }
 }
 
-void traverseModule(torch::jit::Module module, torch::Tensor *input_tensor, int *activation_sum)
+void traverseModule(torch::jit::Module module, torch::Tensor *input_tensor, int *macs_sum)
 {
     if (module.named_children().size() != 0)
     {
         for (const auto &sub_module : module.named_children())
         {
-            traverseModule(sub_module.value, input_tensor, activation_sum);
+            traverseModule(sub_module.value, input_tensor, macs_sum);
         }
     }
     else
@@ -138,13 +138,14 @@ void traverseModule(torch::jit::Module module, torch::Tensor *input_tensor, int 
         torch::jit::Stack stack;
         // Input map served for some operation need to save intermediate value for future used
         std::map<std::string, torch::IValue> input_map;
-        auto original_intput_size = input_tensor->sizes();
+        auto original_input_size = input_tensor->sizes();
         auto op_type = getOperatorType(module.dump_to_str(1, 0, 0));
         if (op_type == "Linear" || op_type == "MatrixSplitMultiplication")
         {
             // Transfer tensor to (1, size) for Linear
             *input_tensor = input_tensor->view({1, input_tensor->numel()});
         }
+        std::cout << op_type << std::endl;
         auto graph = module.get_method("forward").graph();
         for (const auto &node : graph->nodes())
         {
@@ -199,11 +200,35 @@ void traverseModule(torch::jit::Module module, torch::Tensor *input_tensor, int 
             }
         }
         *input_tensor = stack.back().toTensor();
-        std::cout << std::setw(30) << std::left << op_type
-                  << std::setw(30) << std::right << original_intput_size
-                  << std::setw(30) << std::right << input_tensor->sizes()
-                  << std::endl;
-        *activation_sum += input_tensor->numel() * input_tensor->element_size();
+        auto output_size = input_tensor->sizes();
+        if (op_type == "Conv2d")
+        {
+            int64_t batch_size = original_input_size[0];
+            int64_t in_channels = original_input_size[1];
+            int64_t out_channels = output_size[1];
+            int64_t out_height = output_size[2];
+            int64_t out_width = output_size[3];
+
+            // Extract Conv2d parameters
+            auto conv2d_module = module.attr("weight").toTensor();
+            auto kernel_size = conv2d_module.sizes(); // [out_channels, in_channels, kernel_height, kernel_width]
+            int64_t kernel_height = kernel_size[2];
+            int64_t kernel_width = kernel_size[3];
+
+            int64_t conv_macs = out_channels * in_channels * out_height * out_width * kernel_height * kernel_width;
+            *macs_sum += conv_macs;
+
+            std::cout << "MACs for this Conv2d: " << conv_macs << std::endl;
+        }
+        else if (op_type == "MatrixSplitMultiplication")
+        {
+            auto linear_size = module.attr("weight").toTensor().sizes();
+            int64_t m = linear_size[0];
+            int64_t n = linear_size[1];
+            int64_t linear_macs = m * n;
+            *macs_sum += linear_macs;
+            std::cout << "MACs for this MatrixSplitMultiplication: " << linear_macs << std::endl;
+        }
     }
 }
 
@@ -227,12 +252,12 @@ int main(int argc, const char *argv[])
     }
 
     torch::Tensor input_tensor = torch::randn({1, 3, 224, 224});
-    int total_activations = 0;
+    int total_macs = 0;
 
     for (const auto &sub_module : module.named_children())
     {
-        traverseModule(sub_module.value, &input_tensor, &total_activations);
+        traverseModule(sub_module.value, &input_tensor, &total_macs);
     }
-    std::cout << "Total activations memory requirement: " << total_activations << std::endl;
+    std::cout << "Total MACs: " << total_macs << std::endl;
     return 0;
 }
