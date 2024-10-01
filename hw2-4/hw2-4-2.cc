@@ -2,6 +2,8 @@
 #include <torch/torch.h>
 #include <iostream>
 #include <iomanip>
+void traverseModule(torch::jit::Module module, torch::Tensor *input_tensor, int *activation_sum);
+
 std::string getOperatorType(std::string s)
 {
     s = s.substr(0, s.find("\n"));
@@ -124,13 +126,48 @@ void getAttrParam(torch::jit::Node *node, const torch::jit::named_attribute_list
     }
 }
 
+void traverseBasicBlockModule(torch::jit::Module module, torch::Tensor *input_tensor, int *activation_sum)
+{
+    // copy input as downsample submodule input
+    torch::Tensor input_copy = torch::zeros(input_tensor->sizes());
+    input_copy.copy_(*input_tensor);
+
+    for (const auto &sub_module : module.named_children())
+    {
+        if (sub_module.name == "downsample")
+        {
+            for (const auto &downsample_module : sub_module.value.named_children())
+            {
+                traverseModule(downsample_module.value, &input_copy, activation_sum);
+            }
+        }
+        else
+        {
+            traverseModule(sub_module.value, input_tensor, activation_sum);
+        }
+    }
+    // %input.1 : Tensor = aten::add_(%26, %29, %30)
+    *input_tensor = input_tensor->add(input_copy);
+    // relu output activation
+    *activation_sum += input_tensor->numel() * input_tensor->element_size();
+}
+
 void traverseModule(torch::jit::Module module, torch::Tensor *input_tensor, int *activation_sum)
 {
     if (module.named_children().size() != 0)
     {
+
         for (const auto &sub_module : module.named_children())
         {
-            traverseModule(sub_module.value, input_tensor, activation_sum);
+            auto operator_type = getOperatorType(sub_module.value.dump_to_str(1, 0, 0));
+            if (operator_type == "BasicBlock" && sub_module.value.dump_to_str(1, 0, 0).find("downsample") != std::string::npos)
+            {
+                traverseBasicBlockModule(sub_module.value, input_tensor, activation_sum);
+            }
+            else
+            {
+                traverseModule(sub_module.value, input_tensor, activation_sum);
+            }
         }
     }
     else
