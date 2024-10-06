@@ -13,7 +13,22 @@ class Add_Suber extends Module{
 	val o_f = Output(Bool())
   })
 
+  val n = 4
   //please implement your code below
-
-
+  val FA_Array = Array.fill(n)(Module(new FullAdder()).io)
+  val carry = Wire(Vec(n+1, UInt(1.W)))
+  val sum   = Wire(Vec(n, Bool()))
+  carry(0) := io.op
+  val nb = Wire(UInt(n.W))
+  nb := io.in_2 ^ Fill(n, io.op)
+  for (i <- 0 until n) {
+    FA_Array(i).A := io.in_1(i)
+    FA_Array(i).B := nb(i)
+    FA_Array(i).Cin := carry(i)
+    carry(i+1) := FA_Array(i).Cout
+    sum(i) := FA_Array(i).Sum
+  }
+  io.out := sum.asUInt
+  io.o_f := carry(n) ^ carry(n-1)
+  // io.o_f := carry(n) ^ sum(n-1)
 }

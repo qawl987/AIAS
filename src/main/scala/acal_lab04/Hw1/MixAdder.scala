@@ -10,7 +10,25 @@ class MixAdder (n:Int) extends Module{
       val in2 = Input(UInt((4*n).W))
       val Sum = Output(UInt((4*n).W))
       val Cout = Output(UInt(1.W))
+      // Debug use
+      val carry_debug = Output(Vec(n + 1, UInt(1.W)))
+      val sum_debug = Output(Vec(n, UInt(4.W)))
   })
   //please implement your code below
+  val CLA_Array = Array.fill(n)(Module(new CLAdder()).io)
+  val carry = Wire(Vec(n + 1, UInt(1.W)))
+  val sum   = Wire(Vec(n, UInt(4.W)))
+  carry(0) := io.Cin
 
+  for (i <- 0 until n) {
+    CLA_Array(i).in1 := io.in1(4*i+3, 4*i)
+    CLA_Array(i).in2 := io.in2(4*i+3, 4*i)
+    CLA_Array(i).Cin := carry(i)
+    carry(i+1) := CLA_Array(i).Cout
+    sum(i) := CLA_Array(i).Sum
+  }
+  io.Cout := carry(n)
+  io.Sum := sum.asUInt
+  io.carry_debug := carry
+  io.sum_debug := sum
 }
