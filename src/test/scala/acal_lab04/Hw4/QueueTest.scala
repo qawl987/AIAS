@@ -20,7 +20,10 @@ class QueueTests(c: Queue) extends PeekPokeTester(c) {
       if (push == 1) {
         queue.enqueue(dataIn)
       } else if (pop == 1 && queue.length > 0) {
-        nxtDataOut = queue.dequeue()
+        queue.dequeue()
+      }
+      if (queue.length > 0){
+        nxtDataOut = queue.front
       }
     }
 
