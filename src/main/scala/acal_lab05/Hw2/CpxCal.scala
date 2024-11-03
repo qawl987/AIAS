@@ -12,20 +12,17 @@ class CpxCal extends Module{
     val io = IO(new Bundle{
         val key_in = Input(UInt(4.W))
         val value = Output(Valid(UInt(32.W)))
-        val stackDebug = Output(UInt(32.W))
-        val calInputDebug = Output(UInt(32.W))
     })
 
     io.value.bits := 0.U
     io.value.valid := false.B
+    
     // longReg
     val regVec = Module(new LongReg())
     regVec.io.key_in := io.key_in
     regVec.io.push := false.B
     regVec.io.init := false.B
-    val len_reg = RegInit(0.U(8.W))
     val ptr_reg = RegInit(0.U(8.W))
-    val lastPtr_reg = RegNext(ptr_reg)
     val token = WireDefault(0.U(4.W))
     val lastToken_reg = RegNext(token)
     regVec.io.readPtr := ptr_reg
@@ -39,11 +36,13 @@ class CpxCal extends Module{
     infixStack.io.push := false.B
     infixStack.io.pop := false.B
     infixStack.io.dataIn := 0.U
+    infixStack.io.init := false.B
     val calStack = Module(new CalStack(32))
     calStack.io.en := true.B
     calStack.io.push := false.B
     calStack.io.cal := false.B
     calStack.io.dataIn := 0.U
+    calStack.io.init := false.B
     // queue
     val queue = Module(new Queue(new Token(32), 32))  // 8-bit wide, 4 entries deep
     val pushQueue = WireDefault(false.B)
@@ -82,16 +81,47 @@ class CpxCal extends Module{
     when (!negative_reg && lastToken_reg === 13.U && token === 11.U) {
         negative_reg := true.B
     }
+    val inputEnd = WireDefault(false.B)
     val sWait :: sSrc :: sOp :: sEqual :: sWaitCal :: Nil = Enum(5)
     val state = RegInit(sWait)
-    val doneStackPop = RegInit(false.B)
-    val doneCal = WireDefault(false.B)
-    // State
+    
+    // Infix2Postfix
+    val calInput = Wire(new Token(32))
+    calInput.isOperator := false.B
+    calInput.value := 0.U
+    val sNoOperation :: sPendingPush :: sTestStackTop :: sRightBrace :: sPopAllStack :: Nil = Enum(5)
+    val stackOp_reg = RegInit(sNoOperation)
+    val queueData = queue.io.deq.bits
+    val stackData = infixStack.io.dataOut
+    val infixOperator_reg = RegInit(0.U(32.W))
 
+    // Calculate
+    val dataOutLast = WireDefault(0.U(32.W))
+    val dataOutSecond = WireDefault(0.U(32.W))
+    dataOutLast := calStack.io.dataOutLast
+    dataOutSecond := calStack.io.dataOutSecond
+    val doneCal = WireDefault(false.B)
+
+    def resetAllRegs(): Unit = {
+        regVec.io.init := true.B
+        infixStack.io.init := true.B
+        calStack.io.init := true.B
+        state := sWait
+        ptr_reg := 0.U
+        src_reg.value := 0.U
+        src_reg.isOperator := 0.U
+        pending_reg := false.B
+        pendingOp_reg.value := 0.U
+        numberReady_reg := false.B
+        negative_reg := false.B
+        stackOp_reg := sNoOperation
+        infixOperator_reg := 0.U
+    }
+    
+    // State
     switch(state){
         is(sWait){
             regVec.io.push := true.B
-            len_reg := len_reg + 1.U
             when(io.key_in === 15.U) {state := sSrc}
         }
         is(sSrc){
@@ -103,16 +133,20 @@ class CpxCal extends Module{
             when(token === 15.U) {state := sEqual}
         }
         is(sEqual){
-            state := sWaitCal
+            when(inputEnd){ state := sWaitCal }
         }
         is(sWaitCal){
-            when(doneStackPop){
+            when(doneCal){
                 state := sWait
-                // doneStackPop := false.B
+                resetAllRegs()
+                // doneCal := false.B
             }
         }
     }
 
+    io.value.valid := Mux((state === sWaitCal) && doneCal,true.B,false.B)
+    io.value.bits := 0.U
+    
     when(state === sSrc){
         when(token < 10.U){
             src_reg.value := (src_reg.value<<3.U) + (src_reg.value<<1.U) + token
@@ -123,6 +157,7 @@ class CpxCal extends Module{
             ptr_reg := ptr_reg + 1.U
         }
         when(token === 14.U){
+            // Num determine and so ')' Ex: (-14)
             when(!numberReady_reg && !pending_reg){
                 when(negative_reg){
                     src_reg.value := (-src_reg.value.asSInt).asUInt
@@ -131,18 +166,24 @@ class CpxCal extends Module{
                 numberReady_reg := true.B
                 pending_reg := true.B
                 pendingOp_reg.value := 14.U
-            }.elsewhen(numberReady_reg && pending_reg){
+            }
+            // Num have pushed, Next push op
+            .elsewhen(numberReady_reg && pending_reg){
                 numberReady_reg := false.B
-            }.elsewhen(!numberReady_reg && pending_reg){
+            }
+            // Op have pushed
+            .elsewhen(!numberReady_reg && pending_reg){
                 pending_reg := false.B
             }
         }
     }
 
     when(state === sOp){
+        // Src Reday Ex: 50-
         when(src_reg.value =/= 0.U){
             numberReady_reg := true.B
         }
+        // Operator also determine, pending push
         when(operator){
             pending_reg := true.B
             pendingOp_reg.value := token
@@ -150,19 +191,19 @@ class CpxCal extends Module{
     }
     
     when(state === sEqual){
-        opToken.value := 15.U
-        queue.io.enq.bits := opToken
-        pushQueue := true.B
-        ptr_reg := 0.U
-        pending_reg := false.B
-        src_reg.value := 0.U
-        numberReady_reg := false.B
-        negative_reg := false.B
-        regVec.io.init := true.B
+        when(!numberReady_reg && !pending_reg){
+            numberReady_reg := true.B
+            pending_reg := true.B
+            pendingOp_reg.value := 15.U
+        }.elsewhen(numberReady_reg && pending_reg){
+            numberReady_reg := false.B
+        }.elsewhen(!numberReady_reg && pending_reg){
+            pending_reg := false.B
+        }
     }
 
+    // Stack push logic for src and op 
     when(state === sSrc || state === sOp){
-        // Stack push logic
         // If pushing number then don't forward ptr Ex:-12)
         when(numberReady_reg && pending_reg){
             queue.io.enq.bits := src_reg
@@ -194,26 +235,32 @@ class CpxCal extends Module{
         }
     }
 
-    io.value.valid := Mux((state === sWaitCal) && doneCal,true.B,false.B)
-    io.value.bits := 0.U
-    
-    io.stackDebug := queue.io.enq.bits.value
+    // sEqual push queue logic
+    when(state === sEqual){
+        when(numberReady_reg && pending_reg){
+            queue.io.enq.bits := src_reg
+            pushQueue := true.B
+            numberReady_reg := false.B
+            src_reg.value := 0.U
+        }
+        // If simply op then forward ptr Ex: 5-8
+        .elsewhen(numberReady_reg && !pending_reg) {
+            // Push the number
+            queue.io.enq.bits := src_reg
+            pushQueue := true.B
+            numberReady_reg := false.B
+            src_reg.value := 0.U
+        }.elsewhen(!numberReady_reg && pending_reg){
+            queue.io.enq.bits := pendingOp_reg
+            pushQueue := true.B
+            pending_reg := false.B
+            pendingOp_reg.value := 0.U
+            inputEnd := true.B
+        }.otherwise {
+            pushQueue := false.B
+        }
+    }
 
-    // Infix2Postfix
-    val calInput = Wire(new Token(32))
-    calInput.isOperator := false.B
-    calInput.value := 0.U
-    val sNoOperation :: sPendingPush :: sTestStackTop :: sRightBrace :: sPopAllStack :: Nil = Enum(5)
-    val stackOp_reg = RegInit(sNoOperation)
-    val queueData = queue.io.deq.bits
-    val stackData = infixStack.io.dataOut
-    val infixOperator_reg = RegInit(0.U(32.W))
-    // val calDigit = Wire(new Token(32))
-    // calDigit.isOperator := false.B
-    // calDigit.value := 0.U
-    // val calOperator = Wire(new Token(32))
-    // calOperator.isOperator := true.B
-    // calOperator.value := 0.U
     when(queue.io.deq.valid || stackOp_reg =/= sNoOperation){
         // If current don't have stack operation
         // If incoming is '+', and stack top is '*', then save '+'
@@ -306,7 +353,6 @@ class CpxCal extends Module{
             is(sPopAllStack){
                 when(infixStack.io.empty){
                     stackOp_reg := sNoOperation
-                    doneStackPop := true.B
                     calInput.value := 15.U
                     calInput.isOperator := true.B
                 }.otherwise{
@@ -318,14 +364,7 @@ class CpxCal extends Module{
         }
     }
 
-    io.calInputDebug := calInput.value
-    
-    // val dataOutLast = RegNext(RegNext(calStack.io.dataOutLast))
-    // val dataOutSecond = RegNext(RegNext(calStack.io.dataOutSecond))
-    val dataOutLast = WireDefault(0.U(32.W))
-    val dataOutSecond = WireDefault(0.U(32.W))
-    dataOutLast := calStack.io.dataOutLast
-    dataOutSecond := calStack.io.dataOutSecond
+    // Calculate
     when(calInput.value =/= 0.U){
         when(!calInput.isOperator){
             calStack.io.push := true.B
@@ -352,63 +391,3 @@ class CpxCal extends Module{
         }
     }
 }
-// Queue dequeue logic
-    // val dataOut = queue.io.deq.bits
-    // val dataOutValid = queue.io.deq.valid
-    // queueEmpty := !queue.io.deq.valid
-    // dataOutValid := queue.io.deq.valid
-// val stack = Module(new Stack(32))
-//     stack.io.en := true.B
-//     val pushStack = WireDefault(false.B)
-//     stack.io.push := pushStack
-//     stack.io.pop := false.B
-//     stack.io.dataIn := dataInInit
-// val stack = Module(new Stack(32))
-    // val pushStack = WireDefault(false.B)
-    // stack.io.en := true.B
-    // stack.io.push := pushStack
-    // stack.io.pop := false.B
-    // stack.io.dataIn := dataInInit
-
-// val dataOutLast = WireDefault(0.U(32.W))
-//     val dataOutSecond = WireDefault(0.U(32.W))
-//     dataOutLast := calStack.io.dataOutLast
-//     dataOutSecond := calStack.io.dataOutSecond
-//     val saveOp = RegInit(0.U(32.W))
-//     val cntReg = RegInit(0.U(4.W))
-//     val cntDown = RegInit(false.B)
-//     when(cntDown){ cntReg := Mux(cntReg===2.U,0.U,cntReg+(1.U)) }
-//     when(calInput.value =/= 0.U){
-//         when(!calInput.isOperator){
-//             calStack.io.push := true.B
-//             calStack.io.dataIn := calInput.value
-//             cntReg := 0.U
-//             cntDown := true.B
-//         }.otherwise{
-//             saveOp := calInput.value
-//         }
-//     }
-    
-//     when(cntReg =/= 1.U && saveOp =/= 0.U){
-//         switch(saveOp){
-//             is(10.U){
-//                 calStack.io.cal := true.B
-//                 calStack.io.dataIn := (dataOutSecond + dataOutLast)
-//             }
-//             is(11.U){
-//                 calStack.io.cal := true.B
-//                 calStack.io.dataIn :=  (dataOutSecond - dataOutLast)
-//             }
-//             is(12.U){
-//                 calStack.io.cal := true.B
-//                 calStack.io.dataIn :=  (dataOutSecond * dataOutLast)
-//             }
-//             is(15.U){
-//                 doneCal := true.B
-//                 io.value.bits := calStack.io.dataOutLast
-//             }
-//         }
-//         cntReg := 0.U
-//         cntDown := false.B
-//         saveOp := 0.U
-//     }
