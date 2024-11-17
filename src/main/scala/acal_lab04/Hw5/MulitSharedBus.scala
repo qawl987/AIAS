@@ -4,18 +4,6 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.log2Ceil
 
-class MasterInterface(val addrWidth: Int, val dataWidth: Int) extends Bundle {
-    val addr = UInt(addrWidth.W)
-    val data = UInt(dataWidth.W)
-    val size = UInt((log2Ceil(dataWidth / 8)).W)
-}
-
-class SlaveInterface(val addrWidth: Int, val dataWidth: Int) extends Bundle {
-    val addr = UInt(addrWidth.W)
-    val data = UInt(dataWidth.W)
-    val size = UInt((log2Ceil(dataWidth / 8)).W)
-}
-
 class RRArbiter(val addrWidth: Int, val dataWidth: Int, val numMasters: Int) extends Module {
   // Use same as ArbiterIO
   val io = IO(new Bundle {
@@ -46,17 +34,6 @@ class RRArbiter(val addrWidth: Int, val dataWidth: Int, val numMasters: Int) ext
 
   // Delay one cycle to meet the test case
   io.in(RegNext(io.chosen)).ready := RegNext(io.out.ready)
-}
-
-class Decoder(addrWidth: Int, addrMap: Seq[(Int, Int)]) extends Module {
-    val io = IO(new Bundle {
-        val addr = Input(UInt(addrWidth.W))
-        val select = Output(Bool())
-    })
-    val select = addrMap.zipWithIndex.foldLeft(false.B) { case (result, ((startAddress, size), index)) =>
-      result || (io.addr >= startAddress.U && io.addr < (startAddress + size).U)
-    }
-    io.select := select
 }
 
 class MultiShareBus(val addrWidth: Int,val dataWidth: Int,val numMasters: Int,val numSlaves: Int, val addrMap: Seq[(Int, Int)]) extends Module {
