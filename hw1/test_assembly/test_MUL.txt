@@ -1,7 +1,7 @@
 ## RV32 Emulator Testing Assembly Code for MUL function
-
+## expect x30: 0xfffffff1
 main:
-addi x28,x0 ,2
+addi x28,x0 ,-5
 addi x29,x0 ,3
 mul  x30,x28,x29
 hcf

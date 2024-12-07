@@ -49,7 +49,10 @@ typedef enum {
 	UNIMPL = 0,
 
 	//instruction added
-    //MUL,
+    MUL,
+	MULHU,
+	REM,
+	REMU,
     //*****************
 
 	ADD,
@@ -94,7 +97,10 @@ typedef enum {
 
 instr_type parse_instr(char* tok) {
 	//instruction added
-    //if ( streq(tok , "mul")) return MUL;
+    if ( streq(tok , "mul")) return MUL;
+	if ( streq(tok , "mulhu")) return MULHU;
+	if ( streq(tok , "rem")) return REM;
+	if ( streq(tok , "remu")) return REMU;
     //*****************
 
 	if ( streq(tok, "add") ) return ADD;
@@ -523,12 +529,12 @@ int parse_instr(int line, char* ftok, instr* imem, int memoff, label_loc* labels
 			case UNIMPL: return 1;
 
 			//instruction added
-			// case MUL:
-			//     if ( !o1 || !o2 || !o3 || o4 ) print_syntax_error( line,  "Invalid format" );
-			// 	    i->a1.reg = parse_reg(o1 , line);
-			// 	    i->a2.reg = parse_reg(o2 , line);
-			// 	    i->a3.reg = parse_reg(o3 , line);
-			//     return 1;
+			case MUL: case MULHU: case REM: case REMU:
+			    if ( !o1 || !o2 || !o3 || o4 ) print_syntax_error( line,  "Invalid format" );
+				    i->a1.reg = parse_reg(o1 , line);
+				    i->a2.reg = parse_reg(o2 , line);
+				    i->a3.reg = parse_reg(o3 , line);
+			    return 1;
 			//****************
 
 			case JAL:
@@ -765,7 +771,26 @@ void execute(uint8_t* mem, instr* imem, label_loc* labels, int label_count, bool
 		switch (i.op) {
 
 			//instruction added
-      		//case MUL: rf[i.a1.reg] = rf[i.a2.reg] * rf[i.a3.reg]; break;
+      		case MUL:
+			{
+				int64_t result = static_cast<int64_t>(rf[i.a2.reg]) * static_cast<int64_t>(rf[i.a3.reg]);
+				int32_t lower = static_cast<int32_t>(result & 0xFFFFFFFF);
+				rf[i.a1.reg] = static_cast<uint32_t>(lower);
+				break;
+			}
+			case MULHU:
+			{
+				uint64_t result = static_cast<uint64_t>(rf[i.a2.reg]) * static_cast<uint64_t>(rf[i.a3.reg]);
+				rf[i.a1.reg] = result >> 32;
+				break;
+			}
+			case REM:
+			{
+				int32_t result = static_cast<int32_t>(rf[i.a2.reg]) % static_cast<int32_t>(rf[i.a3.reg]);
+				rf[i.a1.reg] = static_cast<uint32_t>(result);
+				break;
+			}
+			case REMU: rf[i.a1.reg] = rf[i.a2.reg] % rf[i.a3.reg]; break;
       		//*****************
 
 			case ADD: rf[i.a1.reg] = rf[i.a2.reg] + rf[i.a3.reg]; break;
