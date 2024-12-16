@@ -8,66 +8,66 @@ class Token(val valueWidth: Int) extends Bundle {
   val value = UInt(valueWidth.W)   // Can hold either the number or the operator encoding
 }
 
-class CpxCal extends Module{
+class CpxCal(val bitsWidth: Int) extends Module{
     val io = IO(new Bundle{
-        val key_in = Input(UInt(4.W))
-        val value = Output(Valid(UInt(32.W)))
+        val key_in = Input(UInt(bitsWidth.W))
+        val value = Output(Valid(UInt(bitsWidth.W)))
     })
 
     io.value.bits := 0.U
     io.value.valid := false.B
     
     // longReg
-    val regVec = Module(new LongReg())
+    val regVec = Module(new LongReg(bitsWidth))
     regVec.io.key_in := io.key_in
     regVec.io.push := false.B
     regVec.io.init := false.B
-    val ptr_reg = RegInit(0.U(8.W))
-    val token = WireDefault(0.U(4.W))
+    val ptr_reg = RegInit(0.U(10.W))
+    val token = WireDefault(0.U(bitsWidth.W))
     val lastToken_reg = RegNext(token)
     regVec.io.readPtr := ptr_reg
     token := regVec.io.output
     // StackInit
-    val dataInInit = Wire(new Token(32))
+    val dataInInit = Wire(new Token(bitsWidth))
     dataInInit.isOperator := false.B
     dataInInit.value := 0.U
-    val infixStack = Module(new OneClockStack(UInt(32.W), 32))
+    val infixStack = Module(new OneClockStack(UInt(bitsWidth.W), 128))
     infixStack.io.en := true.B
     infixStack.io.push := false.B
     infixStack.io.pop := false.B
     infixStack.io.dataIn := 0.U
     infixStack.io.init := false.B
-    val calStack = Module(new CalStack(32))
+    val calStack = Module(new CalStack(bitsWidth, 128))
     calStack.io.en := true.B
     calStack.io.push := false.B
     calStack.io.cal := false.B
     calStack.io.dataIn := 0.U
     calStack.io.init := false.B
     // queue
-    val queue = Module(new Queue(new Token(32), 32))  // 8-bit wide, 4 entries deep
+    val queue = Module(new Queue(new Token(bitsWidth), bitsWidth))  // 8-bit wide, 4 entries deep
     val pushQueue = WireDefault(false.B)
     val deqQueue = WireDefault(false.B)
     queue.io.enq.bits := dataInInit
     queue.io.enq.valid := pushQueue
     queue.io.deq.ready := deqQueue
     // sStore
-    val srcInit = Wire(new Token(32))
+    val srcInit = Wire(new Token(bitsWidth))
     srcInit.isOperator := false.B
     srcInit.value := 0.U
     val src_reg = RegInit(srcInit)
     val pending_reg = RegInit(false.B)
-    val pendingOpInit = Wire(new Token(32))
+    val pendingOpInit = Wire(new Token(bitsWidth))
     pendingOpInit.isOperator := true.B
     pendingOpInit.value := 0.U
     val pendingOp_reg = RegInit(pendingOpInit)
     val numberReady_reg = RegInit(false.B)
-    val opToken = Wire(new Token(32))
+    val opToken = Wire(new Token(bitsWidth))
     opToken.isOperator := true.B
     opToken.value := 0.U
-    val leftBrace = Wire(new Token(32))
+    val leftBrace = Wire(new Token(bitsWidth))
     leftBrace.isOperator := true.B
     leftBrace.value := 13.U
-    val rightBrace = Wire(new Token(32))
+    val rightBrace = Wire(new Token(bitsWidth))
     rightBrace.isOperator := true.B
     rightBrace.value := 14.U
     val operator = WireDefault(false.B)
@@ -86,18 +86,18 @@ class CpxCal extends Module{
     val state = RegInit(sWait)
     
     // Infix2Postfix
-    val calInput = Wire(new Token(32))
+    val calInput = Wire(new Token(bitsWidth))
     calInput.isOperator := false.B
     calInput.value := 0.U
     val sNoOperation :: sPendingPush :: sTestStackTop :: sRightBrace :: sPopAllStack :: Nil = Enum(5)
     val stackOp_reg = RegInit(sNoOperation)
     val queueData = queue.io.deq.bits
     val stackData = infixStack.io.dataOut
-    val infixOperator_reg = RegInit(0.U(32.W))
+    val infixOperator_reg = RegInit(0.U(bitsWidth.W))
 
     // Calculate
-    val dataOutLast = WireDefault(0.U(32.W))
-    val dataOutSecond = WireDefault(0.U(32.W))
+    val dataOutLast = WireDefault(0.U(bitsWidth.W))
+    val dataOutSecond = WireDefault(0.U(bitsWidth.W))
     dataOutLast := calStack.io.dataOutLast
     dataOutSecond := calStack.io.dataOutSecond
     val doneCal = WireDefault(false.B)

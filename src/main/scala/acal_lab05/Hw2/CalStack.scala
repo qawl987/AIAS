@@ -4,22 +4,22 @@ package acal_lab05.Hw2
 import chisel3._
 import chisel3.util.log2Ceil
 
-class CalStack(val depth: Int) extends Module {
+class CalStack(val bitsWidth: Int, val depth: Int) extends Module {
   val io = IO(new Bundle {
     val en      = Input(Bool())
     val push    = Input(Bool())
     val cal     = Input(Bool())
-    val dataIn  = Input(UInt(32.W))
+    val dataIn  = Input(UInt(bitsWidth.W))
     val init = Input(Bool())
-    val dataOutLast = Output(UInt(32.W))
-    val dataOutSecond = Output(UInt(32.W))
+    val dataOutLast = Output(UInt(bitsWidth.W))
+    val dataOutSecond = Output(UInt(bitsWidth.W))
     val empty   = Output(Bool())
   })
 
-  val stack_mem = Mem(depth, UInt(32.W))
+  val stack_mem = Mem(depth, UInt(bitsWidth.W))
   val sp        = RegInit(0.U(log2Ceil(depth+1).W))
-  val outLast       = RegInit(0.U(32.W))
-  val outSecondLast = RegInit(0.U(32.W))
+  val outLast       = RegInit(0.U(bitsWidth.W))
+  val outSecondLast = RegInit(0.U(bitsWidth.W))
 
   when(io.init){
     sp := 0.U
