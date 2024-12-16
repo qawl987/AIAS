@@ -51,6 +51,7 @@ typedef enum {
 	//instruction added
     MUL,
 	MULHU,
+	MULHSU,
 	REM,
 	REMU,
     //*****************
@@ -99,6 +100,7 @@ instr_type parse_instr(char* tok) {
 	//instruction added
     if ( streq(tok , "mul")) return MUL;
 	if ( streq(tok , "mulhu")) return MULHU;
+	if ( streq(tok , "mulhsu")) return MULHSU;
 	if ( streq(tok , "rem")) return REM;
 	if ( streq(tok , "remu")) return REMU;
     //*****************
@@ -529,7 +531,7 @@ int parse_instr(int line, char* ftok, instr* imem, int memoff, label_loc* labels
 			case UNIMPL: return 1;
 
 			//instruction added
-			case MUL: case MULHU: case REM: case REMU:
+			case MUL: case MULHU: case MULHSU: case REM: case REMU:
 			    if ( !o1 || !o2 || !o3 || o4 ) print_syntax_error( line,  "Invalid format" );
 				    i->a1.reg = parse_reg(o1 , line);
 				    i->a2.reg = parse_reg(o2 , line);
@@ -781,13 +783,32 @@ void execute(uint8_t* mem, instr* imem, label_loc* labels, int label_count, bool
 			case MULHU:
 			{
 				uint64_t result = static_cast<uint64_t>(rf[i.a2.reg]) * static_cast<uint64_t>(rf[i.a3.reg]);
-				rf[i.a1.reg] = result >> 32;
+				std::cout<< result << std::endl;
+				rf[i.a1.reg] = static_cast<uint32_t>(result >> 32);
+				std::cout<< rf[i.a1.reg] << std::endl;
+				break;
+			}
+			case MULHSU:
+			{
+				int64_t op1 = static_cast<int64_t>(rf[i.a2.reg]); // Sign-extend the first operand
+				uint64_t op2 = static_cast<uint64_t>(rf[i.a3.reg]); // Zero-extend the second operand
+
+				int64_t result = op1 * static_cast<int64_t>(op2);
+
+				rf[i.a1.reg] = static_cast<uint32_t>(result >> 32);
 				break;
 			}
 			case REM:
 			{
-				int32_t result = static_cast<int32_t>(rf[i.a2.reg]) % static_cast<int32_t>(rf[i.a3.reg]);
-				rf[i.a1.reg] = static_cast<uint32_t>(result);
+				std::cout<< rf[i.a2.reg] << std::endl;
+				std::cout<< rf[i.a3.reg] << std::endl;
+				if(rf[i.a3.reg] != 0) {
+					int32_t result = static_cast<int32_t>(rf[i.a2.reg]) % static_cast<int32_t>(rf[i.a3.reg]);
+					rf[i.a1.reg] = static_cast<uint32_t>(result);
+				}
+				else {
+					rf[i.a1.reg] = static_cast<uint32_t>(rf[i.a2.reg]);
+				}
 				break;
 			}
 			case REMU: rf[i.a1.reg] = rf[i.a2.reg] % rf[i.a3.reg]; break;
