@@ -783,9 +783,7 @@ void execute(uint8_t* mem, instr* imem, label_loc* labels, int label_count, bool
 			case MULHU:
 			{
 				uint64_t result = static_cast<uint64_t>(rf[i.a2.reg]) * static_cast<uint64_t>(rf[i.a3.reg]);
-				std::cout<< result << std::endl;
 				rf[i.a1.reg] = static_cast<uint32_t>(result >> 32);
-				std::cout<< rf[i.a1.reg] << std::endl;
 				break;
 			}
 			case MULHSU:
@@ -800,8 +798,6 @@ void execute(uint8_t* mem, instr* imem, label_loc* labels, int label_count, bool
 			}
 			case REM:
 			{
-				std::cout<< rf[i.a2.reg] << std::endl;
-				std::cout<< rf[i.a3.reg] << std::endl;
 				if(rf[i.a3.reg] != 0) {
 					int32_t result = static_cast<int32_t>(rf[i.a2.reg]) % static_cast<int32_t>(rf[i.a3.reg]);
 					rf[i.a1.reg] = static_cast<uint32_t>(result);
