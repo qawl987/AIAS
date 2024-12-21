@@ -1,13 +1,13 @@
-package lab10.PiplinedCPU
+package acal_lab09.PiplinedCPU
 
 import chisel3._
 import chisel3.util._
 
-import lab10.MemIF._
-import lab10.PiplinedCPU.StageRegister._
-import lab10.PiplinedCPU.Controller._
-import lab10.PiplinedCPU.DatapathModule._
-import lab10.PiplinedCPU.opcode_map._
+import acal_lab09.MemIF._
+import acal_lab09.PiplinedCPU.StageRegister._
+import acal_lab09.PiplinedCPU.Controller._
+import acal_lab09.PiplinedCPU.DatapathModule._
+import acal_lab09.PiplinedCPU.opcode_map._
 
 class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     val io = IO(new Bundle{
@@ -56,32 +56,32 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     val datapath_MEM = Module(new Path_MEM(memAddrWidth))
     val datapath_WB = Module(new Path_WB(memAddrWidth))
 
-    // 1 contorller module
-    val contorller = Module(new Controller(memAddrWidth))
+    // 1 controller module
+    val controller = Module(new Controller(memAddrWidth))
 
     /* Wire Connect */
     // === IF stage reg (PC reg) ======================================================
-    stage_IF.io.Stall := contorller.io.Hcf        // To Be Modified
+    stage_IF.io.Stall := controller.io.Hcf        // To Be Modified
     stage_IF.io.next_pc_in := datapath_IF.io.next_pc
 
     // IF Block Datapath
-    datapath_IF.io.PCSel := contorller.io.PCSel
+    datapath_IF.io.PCSel := controller.io.PCSel
     datapath_IF.io.IF_pc_in := stage_IF.io.pc
     datapath_IF.io.EXE_pc_in := stage_EXE.io.pc
     datapath_IF.io.EXE_target_pc_in := datapath_EXE.io.EXE_target_pc_out
     datapath_IF.io.Mem_data := io.InstMem.rdata(31,0)
 
     // --- Insruction Memory Interface
-    io.InstMem.Mem_R := contorller.io.IM_Mem_R
-    io.InstMem.Mem_W :=  contorller.io.IM_Mem_W
-    io.InstMem.Length :=  contorller.io.IM_Length
+    io.InstMem.Mem_R := controller.io.IM_Mem_R
+    io.InstMem.Mem_W :=  controller.io.IM_Mem_W
+    io.InstMem.Length :=  controller.io.IM_Length
     io.InstMem.raddr := datapath_IF.io.Mem_Addr
     io.InstMem.waddr := 0.U // not used
     io.InstMem.wdata := 0.U // not used
 
     // === ID stage reg ==============================================================
     stage_ID.io.Flush := false.B    // To Be Modified
-    stage_ID.io.Stall := contorller.io.Hcf      // To Be Modified
+    stage_ID.io.Stall := controller.io.Hcf      // To Be Modified
     stage_ID.io.inst_in := datapath_IF.io.inst
     stage_ID.io.pc_in := stage_IF.io.pc
 
@@ -89,12 +89,12 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     datapath_ID.io.ID_inst_in := stage_ID.io.inst
     datapath_ID.io.WB_index := stage_WB.io.inst(11,7)
     datapath_ID.io.WB_wdata := datapath_WB.io.WB_wdata
-    datapath_ID.io.WB_RegWEn := contorller.io.W_RegWEn
-    datapath_ID.io.ImmSel := contorller.io.D_ImmSel
+    datapath_ID.io.WB_RegWEn := controller.io.W_RegWEn
+    datapath_ID.io.ImmSel := controller.io.D_ImmSel
 
     // === EXE stage reg ==============================================================
     stage_EXE.io.Flush := false.B // To Be Modified
-    stage_EXE.io.Stall := contorller.io.Hcf   // To Be Modified
+    stage_EXE.io.Stall := controller.io.Hcf   // To Be Modified
     stage_EXE.io.pc_in := stage_ID.io.pc
     stage_EXE.io.inst_in := stage_ID.io.inst
     stage_EXE.io.imm_in := datapath_ID.io.imm
@@ -106,13 +106,13 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     datapath_EXE.io.EXE_imm_in := stage_EXE.io.imm
     datapath_EXE.io.EXE_rs1_rdata_in := stage_EXE.io.rs1_rdata
     datapath_EXE.io.EXE_rs2_rdata_in := stage_EXE.io.rs2_rdata
-    datapath_EXE.io.E_ASel := contorller.io.E_ASel
-    datapath_EXE.io.E_BSel := contorller.io.E_BSel
-    datapath_EXE.io.E_BrUn := contorller.io.E_BrUn
-    datapath_EXE.io.E_ALUSel := contorller.io.E_ALUSel
+    datapath_EXE.io.E_ASel := controller.io.E_ASel
+    datapath_EXE.io.E_BSel := controller.io.E_BSel
+    datapath_EXE.io.E_BrUn := controller.io.E_BrUn
+    datapath_EXE.io.E_ALUSel := controller.io.E_ALUSel
 
     // === MEM stage reg ==============================================================
-    stage_MEM.io.Stall := contorller.io.Hcf        // To Be Modified
+    stage_MEM.io.Stall := controller.io.Hcf        // To Be Modified
     stage_MEM.io.pc_in := stage_EXE.io.pc
     stage_MEM.io.inst_in := stage_EXE.io.inst
     stage_MEM.io.DM_wdata_in := datapath_EXE.io.EXE_rs2_rdata_out
@@ -125,15 +125,15 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     datapath_MEM.io.Mem_Data := io.DataMem.rdata(31,0)
 
     // --- Data Memory Interface
-    io.DataMem.Mem_R := contorller.io.DM_Mem_R
-    io.DataMem.Mem_W :=  contorller.io.DM_Mem_W
-    io.DataMem.Length :=  contorller.io.DM_Length
+    io.DataMem.Mem_R := controller.io.DM_Mem_R
+    io.DataMem.Mem_W :=  controller.io.DM_Mem_W
+    io.DataMem.Length :=  controller.io.DM_Length
     io.DataMem.raddr := datapath_MEM.io.Mem_Addr
     io.DataMem.waddr := datapath_MEM.io.Mem_Addr
     io.DataMem.wdata := datapath_MEM.io.Mem_Write_Data
 
     // === WB stage reg ==============================================================
-    stage_WB.io.Stall := contorller.io.Hcf        // To Be Modified
+    stage_WB.io.Stall := controller.io.Hcf        // To Be Modified
     stage_WB.io.pc_plus4_in := datapath_MEM.io.MEM_pc_plus_4
     stage_WB.io.inst_in := stage_MEM.io.inst
     stage_WB.io.alu_out_in := datapath_MEM.io.MEM_alu_out
@@ -143,37 +143,37 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     datapath_WB.io.WB_pc_plus4_in := stage_WB.io.pc_plus4
     datapath_WB.io.WB_alu_out_in := stage_WB.io.alu_out
     datapath_WB.io.WB_ld_data_in := stage_WB.io.ld_data
-    datapath_WB.io.W_WBSel := contorller.io.W_WBSel
+    datapath_WB.io.W_WBSel := controller.io.W_WBSel
 
     /* Controller */
-    contorller.io.IF_Inst := io.InstMem.rdata
-    contorller.io.ID_Inst := stage_ID.io.inst
-    contorller.io.EXE_Inst := stage_EXE.io.inst
-    contorller.io.MEM_Inst := stage_MEM.io.inst
-    contorller.io.WB_Inst := stage_WB.io.inst
+    controller.io.IF_Inst := io.InstMem.rdata
+    controller.io.ID_Inst := stage_ID.io.inst
+    controller.io.EXE_Inst := stage_EXE.io.inst
+    controller.io.MEM_Inst := stage_MEM.io.inst
+    controller.io.WB_Inst := stage_WB.io.inst
 
-    contorller.io.E_BrEq := datapath_EXE.io.E_BrEq
-    contorller.io.E_BrLT := datapath_EXE.io.E_BrLT
+    controller.io.E_BrEq := datapath_EXE.io.E_BrEq
+    controller.io.E_BrLT := datapath_EXE.io.E_BrLT
 
-    contorller.io.ID_pc := stage_ID.io.pc
+    controller.io.ID_pc := stage_ID.io.pc
 
-    contorller.io.EXE_target_pc := datapath_EXE.io.EXE_target_pc_out
+    controller.io.EXE_target_pc := datapath_EXE.io.EXE_target_pc_out
 
-    contorller.io.IM_Valid := io.InstMem.Valid
-    contorller.io.DM_Valid := io.DataMem.Valid
+    controller.io.IM_Valid := io.InstMem.Valid
+    controller.io.DM_Valid := io.DataMem.Valid
 
 
     /* System */
     io.regs := datapath_ID.io.regs
-    io.Hcf := contorller.io.Hcf
+    io.Hcf := controller.io.Hcf
 
     /* Test */
-    io.E_Branch_taken := contorller.io.E_Branch_taken
-    // TODO : Flush signal should be modified
-    io.Flush := contorller.io.Flush
-    // TODO : Stall signal should be modified
-    io.Stall_DH := contorller.io.Stall_DH
-    io.Stall_MA := contorller.io.Stall_MA
+    io.E_Branch_taken := controller.io.E_Branch_taken
+    // TODO : Flush signal to be modified
+    io.Flush := controller.io.Flush_WB_ID_DH
+    // TODO : Stall signal to be modified
+    io.Stall_DH := controller.io.Stall_WB_ID_DH
+    io.Stall_MA := controller.io.Stall_MA
     io.IF_PC := stage_IF.io.pc
     io.ID_PC := stage_ID.io.pc
     io.EXE_PC := stage_EXE.io.pc
