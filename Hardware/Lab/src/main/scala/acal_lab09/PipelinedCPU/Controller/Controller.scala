@@ -36,6 +36,7 @@ class Controller(memAddrWidth: Int) extends Module {
     val EXE_target_pc = Input(UInt(memAddrWidth.W))
 
     // Flush
+    // To Be Modified
     val Flush_WB_ID_DH = Output(Bool()) //TBD
     val Flush_BH = Output(Bool()) //TBD
 
@@ -79,12 +80,19 @@ class Controller(memAddrWidth: Int) extends Module {
 
   // Control signal - Branch/Jump
   val E_En = Wire(Bool())
-  E_En := (EXE_opcode===BRANCH)         // To Be Modified
+  E_En := (EXE_opcode===BRANCH || EXE_opcode===JALR || EXE_opcode===JAL)         // To Be Modified
   val E_Branch_taken = Wire(Bool())
   E_Branch_taken := MuxLookup(EXE_opcode, false.B, Seq(
           BRANCH -> MuxLookup(EXE_funct3, false.B, Seq(
-            "b000".U(3.W) -> io.E_BrEq.asUInt,
+            "b000".U(3.W) -> io.E_BrEq.asUInt, // EQ
+            "b001".U(3.W) -> (!io.E_BrEq).asUInt, // NE
+            "b100".U(3.W) -> io.E_BrLT.asUInt, // LT
+            "b101".U(3.W) -> (!io.E_BrLT).asUInt, // GE
+            "b110".U(3.W) -> io.E_BrLT.asUInt, // LTU
+            "b111".U(3.W) -> (!io.E_BrLT).asUInt, // GEU
           )),
+          JALR -> true.B,
+          JAL -> true.B
         ))    // To Be Modified
 
   io.E_En := E_En
@@ -106,22 +114,54 @@ class Controller(memAddrWidth: Int) extends Module {
 
   // Control signal - Immediate generator
   io.D_ImmSel := MuxLookup(ID_opcode, 0.U, Seq(
-    OP_IMM -> I_type,
     LOAD -> I_type,
+    STORE -> S_type,
     BRANCH -> B_type,
-    LUI -> U_type,
+    JALR -> I_type,
+    JAL -> J_type,
+    OP_IMM -> I_type,
+    OP -> R_type,
+    AUIPC -> U_type,
+    LUI -> U_type
   )) // To Be Modified
 
   // Control signal - Scalar ALU
   io.E_ASel := MuxLookup(EXE_opcode, 0.U, Seq(
-    BRANCH -> 1.U,
+    LOAD -> 0.U,
+    STORE -> 0.U,
+    BRANCH -> 1.U, // pc + immediate
+    JALR -> 0.U,
+    JAL -> 1.U,
+    OP_IMM -> 0.U,
+    OP -> 0.U,
+    AUIPC -> 1.U,
     LUI -> 2.U,
   ))    // To Be Modified
-  io.E_BSel := 1.U // To Be Modified
+  io.E_BSel := MuxLookup(EXE_opcode, 0.U, Seq(
+    LOAD -> 1.U,
+    STORE -> 1.U,
+    BRANCH -> 1.U,
+    JALR -> 1.U,
+    JAL -> 1.U,
+    OP_IMM -> 1.U,
+    OP -> 0.U,
+    AUIPC -> 1.U,
+    LUI -> 1.U,
+  )) // To Be Modified
 
   io.E_ALUSel := MuxLookup(EXE_opcode, (Cat(0.U(7.W), "b11111".U, 0.U(3.W))), Seq(
+    // except op other are adding src1, src2
+    LOAD -> (Cat(0.U(7.W), "b11111".U, 0.U(3.W))),
+    STORE -> (Cat(0.U(7.W), "b11111".U, 0.U(3.W))),
+    BRANCH -> (Cat(0.U(7.W), "b11111".U, 0.U(3.W))),
+    JAL -> (Cat(0.U(7.W), "b11111".U, 0.U(3.W))),
+    OP_IMM -> (MuxLookup(EXE_funct3, Cat(0.U(7.W), "b11111".U, EXE_funct3), Seq(
+      "b101".U(3.W) -> Cat(EXE_funct7, "b11111".U, EXE_funct3),
+    ))),
     OP -> (Cat(EXE_funct7, "b11111".U, EXE_funct3)),
-    OP_IMM -> (Cat(0.U(7.W), "b11111".U, EXE_funct3))
+    AUIPC -> (Cat(0.U(7.W), "b11111".U, 0.U(3.W))), // Add, immediate
+    LUI -> (Cat(0.U(7.W), "b11111".U, 0.U(3.W))),
+    
   )) // To Be Modified
 
   // Control signal - Data Memory
@@ -135,15 +175,26 @@ class Controller(memAddrWidth: Int) extends Module {
   io.IM_Length := "b0010".U // always load a word(inst)
 
   // Control signal - Scalar Write Back
+  // Reg write so store doens't need
   io.W_RegWEn := MuxLookup(WB_opcode, false.B, Seq(
-    OP_IMM -> true.B,
     LOAD -> true.B,
+    STORE -> false.B,
+    BRANCH -> false.B,
+    JALR -> true.B,
+    JAL -> true.B,
+    OP_IMM -> true.B,
+    OP -> true.B,
+    AUIPC -> true.B,
     LUI -> true.B,
   ))  // To Be Modified
 
 
   io.W_WBSel := MuxLookup(WB_opcode, ALUOUT, Seq(
+    // store doesn't need write back register
+    // other use aluout
     LOAD -> LD_DATA,
+    JALR -> PC_PLUS_4,
+    JAL -> PC_PLUS_4,
   )) // To Be Modified
 
   // Control signal - Others
