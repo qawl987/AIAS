@@ -37,11 +37,15 @@ class Controller(memAddrWidth: Int) extends Module {
 
     // Flush
     // To Be Modified
+    val Flush_EXE_ID_DH = Output(Bool())
+    val Flush_MEM_ID_DH = Output(Bool())
     val Flush_WB_ID_DH = Output(Bool()) //TBD
     val Flush_BH = Output(Bool()) //TBD
 
     // Stall
     // To Be Modified
+    val Stall_EXE_ID_DH = Output(Bool())
+    val Stall_MEM_ID_DH = Output(Bool())
     val Stall_WB_ID_DH = Output(Bool()) //TBD
     val Stall_MA = Output(Bool()) //TBD
 
@@ -201,13 +205,76 @@ class Controller(memAddrWidth: Int) extends Module {
   io.Hcf := (IF_opcode === HCF)
 
   /****************** Data Hazard ******************/
+  // Use rs in ID stage 
+  val ID_rs1 = io.ID_Inst(19, 15)
+  val ID_rs2 = io.ID_Inst(24, 20)
+  val WB_rd = io.WB_Inst(11, 7)
+  val MEM_rd = io.MEM_Inst(11, 7)
+  val EXE_rd = io.EXE_Inst(11, 7)
+  val is_D_use_rs1 = Wire(Bool()) 
+  val is_D_use_rs2 = Wire(Bool())
+  is_D_use_rs1 := MuxLookup(ID_opcode,false.B,Seq(
+    LOAD -> true.B,
+    STORE -> true.B,
+    BRANCH -> true.B,
+    JALR -> true.B,
+    JAL -> false.B,
+    OP_IMM -> true.B,
+    OP -> true.B,
+    AUIPC -> false.B,
+    LUI -> false.B,
+  ))   // To Be Modified
+  is_D_use_rs2 := MuxLookup(ID_opcode,false.B,Seq(
+    LOAD -> false.B,
+    STORE -> true.B,
+    BRANCH -> true.B,
+    JALR -> false.B,
+    JAL -> false.B,
+    OP_IMM -> false.B,
+    OP -> true.B,
+    AUIPC -> false.B,
+    LUI -> false.B,
+  ))   // To Be Modified
 
+  // Use rd in WB stage
+  val is_W_use_rd = Wire(Bool())
+  val is_MEM_use_rd = Wire(Bool())
+  val is_EXE_use_rd = Wire(Bool())
+  is_W_use_rd := MuxLookup(WB_opcode,true.B,Seq(
+    STORE -> false.B,
+    BRANCH -> false.B,
+  ))   // To Be Modified
+  is_MEM_use_rd := MuxLookup(MEM_opcode,true.B,Seq(
+    STORE -> false.B,
+    BRANCH -> false.B,
+  ))
+  is_EXE_use_rd := MuxLookup(EXE_opcode,true.B,Seq(
+    STORE -> false.B,
+    BRANCH -> false.B,
+  ))
+  // Hazard condition (rd, rs overlap)
+  val is_D_rs1_W_rd_overlap = Wire(Bool())
+  val is_D_rs2_W_rd_overlap = Wire(Bool())
+  val is_D_rs1_MEM_rd_overlap = Wire(Bool())
+  val is_D_rs2_MEM_rd_overlap = Wire(Bool())
+  val is_D_rs1_EXE_rd_overlap = Wire(Bool())
+  val is_D_rs2_EXE_rd_overlap = Wire(Bool())
+  is_D_rs1_W_rd_overlap := is_D_use_rs1 && is_W_use_rd && (ID_rs1 === WB_rd) && (WB_rd =/= 0.U(5.W))
+  is_D_rs2_W_rd_overlap := is_D_use_rs2 && is_W_use_rd && (ID_rs2 === WB_rd) && (WB_rd =/= 0.U(5.W))
+  is_D_rs1_MEM_rd_overlap := is_D_use_rs1 && is_MEM_use_rd && (ID_rs1 === MEM_rd) && (MEM_rd =/= 0.U(5.W))
+  is_D_rs2_MEM_rd_overlap := is_D_use_rs2 && is_MEM_use_rd && (ID_rs2 === MEM_rd) && (MEM_rd =/= 0.U(5.W))
+  is_D_rs1_EXE_rd_overlap := is_D_use_rs1 && is_EXE_use_rd && (ID_rs1 === EXE_rd) && (EXE_rd =/= 0.U(5.W))
+  is_D_rs2_EXE_rd_overlap := is_D_use_rs2 && is_EXE_use_rd && (ID_rs2 === EXE_rd) && (EXE_rd =/= 0.U(5.W))
   // Control signal - Stall
-  io.Stall_WB_ID_DH := false.B // Stall for Data Hazard
+  io.Stall_WB_ID_DH := (is_D_rs1_W_rd_overlap || is_D_rs2_W_rd_overlap)// Stall for Data Hazard
+  io.Stall_MEM_ID_DH := (is_D_rs1_MEM_rd_overlap || is_D_rs2_MEM_rd_overlap)
+  io.Stall_EXE_ID_DH := (is_D_rs1_EXE_rd_overlap || is_D_rs2_EXE_rd_overlap)
   io.Stall_MA := false.B // Stall for Waiting Memory Access
   // Control signal - Flush
-  io.Flush_WB_ID_DH := false.B
-  io.Flush_BH := false.B
+  io.Flush_WB_ID_DH := (is_D_rs1_W_rd_overlap || is_D_rs2_W_rd_overlap)
+  io.Flush_MEM_ID_DH := (is_D_rs1_MEM_rd_overlap || is_D_rs2_MEM_rd_overlap)
+  io.Flush_EXE_ID_DH := (is_D_rs1_EXE_rd_overlap || is_D_rs2_EXE_rd_overlap)
+  io.Flush_BH := Predict_Miss
 
   // Control signal - Data Forwarding (Bonus)
 

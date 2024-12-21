@@ -61,7 +61,7 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
 
     /* Wire Connect */
     // === IF stage reg (PC reg) ======================================================
-    stage_IF.io.Stall := controller.io.Hcf        // To Be Modified
+    stage_IF.io.Stall := (controller.io.Hcf||controller.io.Stall_WB_ID_DH||controller.io.Stall_MEM_ID_DH||controller.io.Stall_EXE_ID_DH)        // To Be Modified
     stage_IF.io.next_pc_in := datapath_IF.io.next_pc
 
     // IF Block Datapath
@@ -80,8 +80,8 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     io.InstMem.wdata := 0.U // not used
 
     // === ID stage reg ==============================================================
-    stage_ID.io.Flush := false.B    // To Be Modified
-    stage_ID.io.Stall := controller.io.Hcf      // To Be Modified
+    stage_ID.io.Flush := controller.io.Flush_BH    // To Be Modified
+    stage_ID.io.Stall := (controller.io.Hcf||controller.io.Stall_WB_ID_DH||controller.io.Stall_MEM_ID_DH||controller.io.Stall_EXE_ID_DH)      // To Be Modified
     stage_ID.io.inst_in := datapath_IF.io.inst
     stage_ID.io.pc_in := stage_IF.io.pc
 
@@ -93,7 +93,7 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     datapath_ID.io.ImmSel := controller.io.D_ImmSel
 
     // === EXE stage reg ==============================================================
-    stage_EXE.io.Flush := false.B // To Be Modified
+    stage_EXE.io.Flush := (controller.io.Flush_BH||controller.io.Flush_WB_ID_DH||controller.io.Flush_MEM_ID_DH||controller.io.Flush_EXE_ID_DH) // To Be Modified
     stage_EXE.io.Stall := controller.io.Hcf   // To Be Modified
     stage_EXE.io.pc_in := stage_ID.io.pc
     stage_EXE.io.inst_in := stage_ID.io.inst
@@ -170,9 +170,9 @@ class PiplinedCPU(memAddrWidth: Int, memDataWidth: Int) extends Module {
     /* Test */
     io.E_Branch_taken := controller.io.E_Branch_taken
     // TODO : Flush signal to be modified
-    io.Flush := controller.io.Flush_WB_ID_DH
+    io.Flush := (controller.io.Flush_BH||controller.io.Flush_WB_ID_DH)
     // TODO : Stall signal to be modified
-    io.Stall_DH := controller.io.Stall_WB_ID_DH
+    io.Stall_DH := (controller.io.Stall_WB_ID_DH||controller.io.Stall_MEM_ID_DH||controller.io.Stall_EXE_ID_DH)
     io.Stall_MA := controller.io.Stall_MA
     io.IF_PC := stage_IF.io.pc
     io.ID_PC := stage_ID.io.pc
