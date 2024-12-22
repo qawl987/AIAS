@@ -17,6 +17,9 @@ class top extends Module {
         val rdata = Output(UInt(32.W))
 
         // Test
+        val Mem_R = Output(Bool())
+        val Mem_W = Output(Bool())
+        val Length = Output(UInt(4.W))
         val E_Branch_taken = Output(Bool())
         val Flush = Output(Bool())
         val Stall_MA = Output(Bool())
@@ -67,6 +70,9 @@ class top extends Module {
     io.rdata := dm.io.rdata
 
     // Test
+    io.Mem_R := cpu.io.DataMem.Mem_R
+    io.Mem_W := cpu.io.DataMem.Mem_W
+    io.Length := cpu.io.DataMem.Length
     io.E_Branch_taken := cpu.io.E_Branch_taken
     io.Flush := cpu.io.Flush
     io.Stall_MA := cpu.io.Stall_MA

@@ -11,6 +11,25 @@ class topTest(dut:top) extends PeekPokeTester(dut){
     val filename = "./src/main/resource/inst.asm"
     val lines = Source.fromFile(filename).getLines.toList
 
+    /* Lab 9_3 performance counter */
+    var Cycle_Count = 0
+    var Inst_Count = 0
+    var Conditional_Branch_Count = 0
+    var Unconditional_Branch_Count = 0
+    var Conditional_Branch_Hit_Count = 0
+    var Unconditional_Branch_Hit_Count = 0
+    var Flush_Count = 0
+    // counter 8~13
+    var Mem_Read_Stall_Cycle_Count = 0
+    var Mem_Write_Stall_Cycle_Count = 0
+    var Mem_Read_Request_Count = 0
+    var Mem_Write_Request_Count = 0
+    var Mem_Read_Bytes_Count = 0
+    var Mem_Write_Bytes_Count = 0
+    var Committed_Instruction_Count = 0
+    var Mem_Length = 0
+    /* Lab 9_3 performance counter */
+
     while(!peek(dut.io.Hcf)){
         var PC_IF = peek(dut.io.IF_PC).toInt
         var PC_ID = peek(dut.io.ID_PC).toInt
@@ -35,6 +54,10 @@ class topTest(dut:top) extends PeekPokeTester(dut){
         var EXE_Jump = peek(dut.io.EXE_Jump).toInt
         var EXE_Branch = peek(dut.io.EXE_Branch).toInt
 
+        // new
+        var Mem_R = peek(dut.io.Mem_R)
+        var Mem_W = peek(dut.io.Mem_W)
+        var Length = peek(dut.io.Length).toInt
         println(s"[PC_IF ]${"%8d".format(PC_IF)} [Inst] ${"%-25s".format(lines(PC_IF>>2))} ")
         println(s"[PC_ID ]${"%8d".format(PC_ID)} [Inst] ${"%-25s".format(lines(PC_ID>>2))} ")
         println(s"[PC_EXE]${"%8d".format(PC_EXE)} [Inst] ${"%-25s".format(lines(PC_EXE>>2))} "+
@@ -49,6 +72,60 @@ class topTest(dut:top) extends PeekPokeTester(dut){
                 s"[ WB reg ]${"%8d".format(WB_reg)} [WB  data]${"%8s".format(WB_wdata)}")
         println(s"[Flush ] ${"%1d".format(Flush)} [Stall_MA ] ${"%1d".format(Stall_MA)} [Stall_DH ] ${"%1d".format(Stall_DH)} ")
         println("==============================================")
+
+        /* Lab 9_3 performance counter */
+        Cycle_Count += 1 //Cycle
+        if(Stall_MA==0 && Stall_DH==0){
+            Inst_Count += 1   // Not Stall, read inst
+            Committed_Instruction_Count += 1
+            if(EXE_Branch==1){
+                Conditional_Branch_Count += 1
+                if(Flush == 0){
+                    Conditional_Branch_Hit_Count += 1
+                }else{
+                    Flush_Count += 1
+                    Committed_Instruction_Count -= 1 // if branch loss one inst in ID
+                }
+            }
+            if(EXE_Jump==1){
+                Unconditional_Branch_Count += 1
+                if(Flush == 0){
+                    Unconditional_Branch_Hit_Count += 1
+                }else{
+                    Flush_Count += 1
+                    Committed_Instruction_Count -= 1 // if branch loss one inst in ID
+                }
+            }
+        }
+        if(Stall_MA==1){
+            if(Mem_R){
+                Mem_Read_Stall_Cycle_Count += 1
+            }
+            if(Mem_W){
+                Mem_Write_Stall_Cycle_Count += 1
+            }
+        }
+        if(Mem_R){
+            Mem_Read_Request_Count += 1
+            Mem_Length = Length match {
+                case 0 => 1
+                case 1 => 2
+                case 2 => 4
+                case 4 => 1
+                case 5 => 2
+            }
+            Mem_Read_Bytes_Count += Mem_Length
+        }
+        if(Mem_W){
+            Mem_Write_Request_Count += 1
+            Mem_Length = Length match {
+                case 0 => 1
+                case 1 => 2
+                case 2 => 4
+            }
+            Mem_Write_Bytes_Count += Mem_Length
+        }
+        /* Lab 9_3 performance counter */
 
         step(1)
     }
@@ -78,6 +155,33 @@ class topTest(dut:top) extends PeekPokeTester(dut){
                 s"reg[${"%02d".format(8*i+6)}]：${value_6} " +
                 s"reg[${"%02d".format(8*i+7)}]：${value_7} ")
     }
+    /* Lab 9_3 performance counter */
+    // Performance Counter
+    println("==============================================================")
+    println("Performance Counter:")
+    println(s"[Cycle Count                    ] ${"%8d".format(Cycle_Count)}")
+    println(s"[Inst Count                     ] ${"%8d".format(Inst_Count)}")
+    println(s"[Conditional Branch Count       ] ${"%8d".format(Conditional_Branch_Count)}")
+    println(s"[Unconditional Branch Count     ] ${"%8d".format(Unconditional_Branch_Count)}")
+    println(s"[Conditional Branch Hit Count   ] ${"%8d".format(Conditional_Branch_Hit_Count)}")
+    println(s"[Unconditional Branch Hit Count ] ${"%8d".format(Unconditional_Branch_Hit_Count)}")
+    println(s"[Mem Read Stall Cycle Count     ] ${"%8d".format(Mem_Read_Stall_Cycle_Count)}")
+    println(s"[Mem Write Stall Cycle Count    ] ${"%8d".format(Mem_Write_Stall_Cycle_Count)}")
+    println(s"[Mem Read Request Count         ] ${"%8d".format(Mem_Read_Request_Count)}")
+    println(s"[Mem Write Request Count        ] ${"%8d".format(Mem_Write_Request_Count)}")
+    println(s"[Mem Read Bytes Count           ] ${"%8d".format(Mem_Read_Bytes_Count)}")
+    println(s"[Mem Write Bytes Count          ] ${"%8d".format(Mem_Write_Bytes_Count)}")
+    println(s"[Committed Instruction Count    ] ${"%8d".format(Committed_Instruction_Count)}")
+    /* Lab 9_3 performance counter */
+    // Performance Analysis
+    println("==============================================================")
+    println("Performance Analysis:")
+    println(s"[CPI                                  ] ${"%8f".format(Cycle_Count.toFloat/Inst_Count.toFloat)}")
+    println(s"[Average Mem Read Request Stall Cycle ] ${"%8f".format(Mem_Read_Stall_Cycle_Count.toFloat/Mem_Read_Request_Count.toFloat)}")
+    println(s"[Average Mem Write Request Stall Cycle] ${"%8f".format(Mem_Write_Stall_Cycle_Count.toFloat/Mem_Write_Request_Count.toFloat)}")
+    println(s"[Total Bus bandwidth requiement       ] ${"%8f".format(Mem_Read_Bytes_Count.toFloat/Mem_Write_Bytes_Count.toFloat)}")
+    println("==============================================================")
+    /* Lab 9_3 performance counter */
 }
 
 object topTest extends App{
